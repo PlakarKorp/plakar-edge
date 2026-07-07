@@ -95,8 +95,8 @@ func main() {
 	var cfg Config
 	var enrollmentKey, name string
 
-	flag.StringVar(&cfg.APIURL, "api-url", "", "plakman control plane API base URL (required)")
-	flag.StringVar(&enrollmentKey, "enrollment-key", "", "enrollment key (required on first run)")
+	flag.StringVar(&cfg.APIURL, "control-plane", "", "plakman control plane API base URL (required)")
+	flag.StringVar(&enrollmentKey, "enroll", "", "enrollment key (required on first run)")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
@@ -104,7 +104,7 @@ func main() {
 	flag.Parse()
 
 	if cfg.APIURL == "" {
-		fatal("-api-url is required")
+		fatal("-control-plane is required")
 	}
 
 	// Default the package dir under the state dir, and make it absolute so the
@@ -134,7 +134,7 @@ func main() {
 		log.Printf("resuming as edge %s", st.EdgeId)
 	case os.IsNotExist(err):
 		if enrollmentKey == "" {
-			fatal("no persisted identity and -enrollment-key not provided")
+			fatal("no persisted identity and -enroll not provided")
 		}
 		st = enroll(rootCtx, clt, &cfg, enrollmentKey, name, hostname)
 		if st == nil {

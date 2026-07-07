@@ -52,8 +52,8 @@ separate `plaklet` binary to build or ship. Building the edge builds plaklet.
 
 ```sh
 plakar-edge \
-  -api-url        https://plakman.example.com \
-  -enrollment-key <key from the control plane> \
+  -control-plane  https://plakman.example.com \
+  -enroll         <key from the control plane> \
   -name           edge-paris-1 \
   -state-dir      /var/lib/plakar-edge \
   -pkg            /var/lib/plakar-edge/pkgs
@@ -72,15 +72,15 @@ proxies it from the plugin feed. Packages are cached under `<pkg>/integrations`
 and reused, so each is downloaded only once.
 
 After the first successful enrollment the token is stored under `-state-dir`;
-subsequent restarts resume with it and `-enrollment-key` is no longer required.
-If the control plane is unreachable at first boot, enrollment retries with
-backoff until it succeeds (a rejected enrollment key is fatal). Once enrolled,
-the poll loop likewise retries through control-plane outages.
+subsequent restarts resume with it and `-enroll` is no longer required. If the
+control plane is unreachable at first boot, enrollment retries with backoff until
+it succeeds (a rejected enrollment key is fatal). Once enrolled, the poll loop
+likewise retries through control-plane outages.
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `-api-url` | *(required)* | Control plane API base URL |
-| `-enrollment-key` | | Enrollment key; required only on first boot |
+| `-control-plane` | *(required)* | Control plane API base URL |
+| `-enroll` | | Enrollment key; required only on first boot |
 | `-name` | hostname | Edge name registered with the control plane |
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |

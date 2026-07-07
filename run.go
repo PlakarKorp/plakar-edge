@@ -81,6 +81,17 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {
 	plakletArgs := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
 
+	// Honor the task's execution limits (set on the scheduler task as
+	// exec.cpu / exec.concurrency and flowed through in TaskConfig). Without
+	// this the edge's plaklet always ran at its default (NumCPU) concurrency,
+	// ignoring the task setting — which can OOM on large sources.
+	if v := item.TaskConfig["exec.cpu"]; v != "" {
+		plakletArgs = append(plakletArgs, "-cpu", v)
+	}
+	if v := item.TaskConfig["exec.concurrency"]; v != "" {
+		plakletArgs = append(plakletArgs, "-concurrency", v)
+	}
+
 	// Default path: re-exec this same binary with the "plaklet" subcommand, so
 	// the embedded executor runs. Only use an external binary if -plaklet-bin was
 	// set explicitly.

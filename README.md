@@ -60,11 +60,13 @@ plakar-edge \
 ```
 
 To execute a task the daemon re-execs itself as `plakar-edge plaklet …`; no
-external binary is needed. (You can still point `-plaklet-bin` at a separate
-plaklet binary to override this, e.g. for one built with extra connectors.)
+external binary is needed.
 
 After the first successful enrollment the token is stored under `-state-dir`;
 subsequent restarts resume with it and `-enrollment-key` is no longer required.
+If the control plane is unreachable at first boot, enrollment retries with
+backoff until it succeeds (a rejected enrollment key is fatal). Once enrolled,
+the poll loop likewise retries through control-plane outages.
 
 | Flag | Default | Meaning |
 |------|---------|---------|
@@ -72,8 +74,8 @@ subsequent restarts resume with it and `-enrollment-key` is no longer required.
 | `-enrollment-key` | | Enrollment key; required only on first boot |
 | `-name` | hostname | Edge name registered with the control plane |
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
-| `-plaklet-bin` | *(self)* | Path to an external plaklet binary; default re-execs self |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |
+| `-poll-hold` | `30s` | Expected server-side long-poll hold |
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
 
 ## Wire protocol

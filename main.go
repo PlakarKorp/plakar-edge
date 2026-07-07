@@ -13,6 +13,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -31,8 +32,11 @@ var Version = "v0.1.0-devel"
 
 // Config holds everything the daemon needs at runtime.
 type Config struct {
-	APIURL     string
-	StateDir   string
+	APIURL   string
+	StateDir string
+	// PlakletBin overrides the executor binary. In production it is always empty
+	// — the daemon re-execs itself with the "plaklet" subcommand. It exists only
+	// so tests can inject a fake plaklet; there is no CLI flag for it.
 	PlakletBin string
 	// PkgDir is the plaklet package base directory. Plaklet is invoked with
 	// its integrations under <PkgDir>/integrations and its cache under
@@ -94,9 +98,6 @@ func main() {
 	flag.StringVar(&enrollmentKey, "enrollment-key", "", "enrollment key (required on first run)")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
-	// PlakletBin defaults to empty, meaning "re-exec myself with the plaklet
-	// subcommand". Set it only to run a separate/external plaklet binary.
-	flag.StringVar(&cfg.PlakletBin, "plaklet-bin", "", "path to an external plaklet binary (default: self)")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (expects <pkg>/integrations and <pkg>/cache)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
 	flag.Parse()
@@ -110,6 +111,9 @@ func main() {
 		name = hostname
 	}
 
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	clt := NewClient(cfg.APIURL)
 
 	// Load a persisted identity, or enroll if this is the first boot.
@@ -121,39 +125,72 @@ func main() {
 		if enrollmentKey == "" {
 			fatal("no persisted identity and -enrollment-key not provided")
 		}
-		log.Printf("enrolling as %q against %s (protocol v%d)", name, cfg.APIURL, EdgeProtocolVersion)
-		resp, err := clt.Enroll(context.Background(), EnrollRequest{
-			EnrollmentKey:   enrollmentKey,
-			Name:            name,
-			Hostname:        hostname,
-			ProtocolVersion: EdgeProtocolVersion,
-			EdgeVersion:     Version,
-		})
-		if err != nil {
-			fatal("enrollment failed: %v", err)
+		st = enroll(rootCtx, clt, &cfg, enrollmentKey, name, hostname)
+		if st == nil {
+			return // context canceled during enrollment (SIGTERM)
 		}
-		if !resp.Supported {
-			log.Printf("WARNING: control plane protocol is v%d, this edge speaks v%d; "+
-				"the control plane will not dispatch work until this edge is upgraded",
-				resp.ProtocolVersion, EdgeProtocolVersion)
-		}
-		st = &state{EdgeId: resp.EdgeId.String(), Token: resp.Token}
-		if err := saveState(&cfg, st); err != nil {
-			fatal("failed to persist identity: %v", err)
-		}
-		log.Printf("enrolled as edge %s", st.EdgeId)
 	default:
 		fatal("failed to read state: %v", err)
 	}
 
 	clt.SetToken(st.Token)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	log.Printf("edge %s online, polling %s", st.EdgeId, cfg.APIURL)
-	pollLoop(ctx, clt, &cfg)
+	pollLoop(rootCtx, clt, &cfg)
 	log.Printf("edge %s shutting down", st.EdgeId)
+}
+
+// enrollRetryDelay is how long enrollment waits between attempts when the
+// control plane is unreachable or erroring transiently. A var (not const) so
+// tests can shorten it.
+var enrollRetryDelay = 5 * time.Second
+
+// enroll registers this edge, retrying on transient failures (network errors,
+// 5xx) until it succeeds or the context is canceled. A definitive rejection
+// (4xx — e.g. a wrong/absent enrollment key) is fatal: retrying it is pointless.
+// Returns nil only if the context is canceled before enrollment succeeds.
+func enroll(ctx context.Context, clt *Client, cfg *Config, key, name, hostname string) *state {
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		log.Printf("enrolling as %q against %s (protocol v%d)", name, cfg.APIURL, EdgeProtocolVersion)
+		resp, err := clt.Enroll(ctx, EnrollRequest{
+			EnrollmentKey:   key,
+			Name:            name,
+			Hostname:        hostname,
+			ProtocolVersion: EdgeProtocolVersion,
+			EdgeVersion:     Version,
+		})
+		if err != nil {
+			// A 4xx is a definitive rejection (bad key, bad request): fatal.
+			var he *HTTPError
+			if errors.As(err, &he) && he.Status >= 400 && he.Status < 500 {
+				fatal("enrollment rejected: %v", err)
+			}
+			// Otherwise transient (control plane down/starting, 5xx, network):
+			// back off and retry.
+			log.Printf("enrollment failed: %v (retrying in %s)", err, enrollRetryDelay)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(enrollRetryDelay):
+			}
+			continue
+		}
+
+		if !resp.Supported {
+			log.Printf("WARNING: control plane protocol is v%d, this edge speaks v%d; "+
+				"the control plane will not dispatch work until this edge is upgraded",
+				resp.ProtocolVersion, EdgeProtocolVersion)
+		}
+		st := &state{EdgeId: resp.EdgeId.String(), Token: resp.Token}
+		if err := saveState(cfg, st); err != nil {
+			fatal("failed to persist identity: %v", err)
+		}
+		log.Printf("enrolled as edge %s", st.EdgeId)
+		return st
+	}
 }
 
 // pollLoop is the daemon's heart: long-poll, run, repeat, until the context is

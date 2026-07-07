@@ -13,6 +13,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// HTTPError is returned by the client when the control plane replies with a 4xx
+// or 5xx. Status lets callers classify the failure — e.g. a 4xx enrollment
+// rejection (fatal) versus a 5xx (transient, worth retrying).
+type HTTPError struct {
+	Status int
+	msg    string
+}
+
+func (e *HTTPError) Error() string { return e.msg }
+
 // Client talks to the plakman edge API. It is deliberately tiny and stdlib-only.
 type Client struct {
 	baseURL string
@@ -92,7 +102,10 @@ func (c *Client) doStatus(ctx context.Context, method, path string, body, out an
 
 	if resp.StatusCode >= 400 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return resp.StatusCode, fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(msg)))
+		return resp.StatusCode, &HTTPError{
+			Status: resp.StatusCode,
+			msg:    fmt.Sprintf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(msg))),
+		}
 	}
 
 	if out != nil && resp.StatusCode != http.StatusNoContent {

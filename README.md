@@ -77,3 +77,14 @@ subsequent restarts resume with it and `-enrollment-key` is no longer required.
 plane and with `plaklet`. These are **duplicated** from plakman on purpose, to
 keep this repository free of any plakman-internal dependency; the file documents
 the plakman source of truth to keep in sync with.
+
+### Protocol version
+
+The edge sends `EdgeProtocolVersion` (an integer) at enrollment. It is bumped
+only when the wire structs (`WorkItem` / `Reply` / `Configuration` / the plaklet
+`ExecPayload`/`ExecReply`) change, so the edge and the control plane can release
+independently. The control plane records it; if it does not support that
+version, the edge still enrolls (so it stays visible) but is **not dispatched
+work** until upgraded — the enroll response's `supported` flag signals this, and
+the daemon logs a warning. A separate `edge_version` build string is reported
+for observability only and is not used for gating.

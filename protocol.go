@@ -16,15 +16,28 @@ import (
 
 // ---- Edge <-> control plane API ----
 
+// EdgeProtocolVersion is the wire protocol version this edge speaks. It must
+// match plakman's contract.EdgeProtocolVersion for the control plane to dispatch
+// work; it is bumped only when the WorkItem/Reply/Configuration or plaklet
+// ExecPayload/ExecReply shapes change. Keep in sync with plakman.
+const EdgeProtocolVersion = 1
+
 type EnrollRequest struct {
-	EnrollmentKey string `json:"enrollment_key"`
-	Name          string `json:"name"`
-	Hostname      string `json:"hostname"`
+	EnrollmentKey   string `json:"enrollment_key"`
+	Name            string `json:"name"`
+	Hostname        string `json:"hostname"`
+	ProtocolVersion int    `json:"protocol_version"`
+	EdgeVersion     string `json:"edge_version"`
 }
 
 type EnrollResponse struct {
 	EdgeId uuid.UUID `json:"edge_id"`
 	Token  string    `json:"token"`
+	// ProtocolVersion is the control plane's protocol; Supported is whether it
+	// can dispatch to this edge. When false, the edge enrolls but gets no work
+	// until upgraded.
+	ProtocolVersion int  `json:"protocol_version"`
+	Supported       bool `json:"supported"`
 }
 
 type WorkItem struct {

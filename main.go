@@ -22,6 +22,11 @@ import (
 	"time"
 )
 
+// Version is the plakar-edge build version, reported to the control plane at
+// enrollment for observability (not used for compatibility gating — that is the
+// protocol version). Override at build time with -ldflags "-X main.Version=...".
+var Version = "v0.1.0-devel"
+
 // Config holds everything the daemon needs at runtime.
 type Config struct {
 	APIURL     string
@@ -104,14 +109,21 @@ func main() {
 		if enrollmentKey == "" {
 			fatal("no persisted identity and -enrollment-key not provided")
 		}
-		log.Printf("enrolling as %q against %s", name, cfg.APIURL)
+		log.Printf("enrolling as %q against %s (protocol v%d)", name, cfg.APIURL, EdgeProtocolVersion)
 		resp, err := clt.Enroll(context.Background(), EnrollRequest{
-			EnrollmentKey: enrollmentKey,
-			Name:          name,
-			Hostname:      hostname,
+			EnrollmentKey:   enrollmentKey,
+			Name:            name,
+			Hostname:        hostname,
+			ProtocolVersion: EdgeProtocolVersion,
+			EdgeVersion:     Version,
 		})
 		if err != nil {
 			fatal("enrollment failed: %v", err)
+		}
+		if !resp.Supported {
+			log.Printf("WARNING: control plane protocol is v%d, this edge speaks v%d; "+
+				"the control plane will not dispatch work until this edge is upgraded",
+				resp.ProtocolVersion, EdgeProtocolVersion)
 		}
 		st = &state{EdgeId: resp.EdgeId.String(), Token: resp.Token}
 		if err := saveState(&cfg, st); err != nil {

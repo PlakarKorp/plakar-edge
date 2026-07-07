@@ -233,6 +233,14 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			if ctx.Err() != nil {
 				return
 			}
+			// A 401/403 means our saved token isn't valid for this control
+			// plane — typically a stale state file pointed at a different or
+			// rebuilt plakman. Retrying can never fix it, so fail loudly and
+			// tell the operator to re-enroll rather than spinning forever.
+			if isUnauthorizedError(err) {
+				fatal("control plane rejected our identity (%v); the saved token is invalid for %s. "+
+					"Re-enroll: remove the state dir (%s) and pass -enroll <key>.", err, cfg.APIURL, cfg.StateDir)
+			}
 			log.Printf("poll error: %v (retrying in %s)", err, backoff)
 			select {
 			case <-ctx.Done():
@@ -248,6 +256,16 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 		// Run synchronously: one edge handles one task at a time for the PoC.
 		runWork(ctx, clt, cfg, item)
 	}
+}
+
+// isUnauthorizedError reports whether err is an HTTP 401/403 from the control
+// plane — i.e. our bearer token was rejected. Distinct from a transient error
+// (5xx, network) because it can never succeed on retry: the token is wrong for
+// this control plane and the operator must re-enroll.
+func isUnauthorizedError(err error) bool {
+	var he *HTTPError
+	return errors.As(err, &he) &&
+		(he.Status == http.StatusUnauthorized || he.Status == http.StatusForbidden)
 }
 
 func fatal(format string, args ...any) {

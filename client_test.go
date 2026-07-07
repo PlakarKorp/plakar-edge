@@ -90,12 +90,22 @@ func TestPollNoContent(t *testing.T) {
 		if r.URL.Path != "/api/v1/edge/poll" {
 			t.Errorf("path = %s, want /api/v1/edge/poll", r.URL.Path)
 		}
+		var got PollRequest
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("decode poll body: %v", err)
+		}
+		if got.EdgeVersion != "v9.9.9" || got.Hostname != "edge-host" {
+			t.Errorf("poll body = %+v, want EdgeVersion=v9.9.9 Hostname=edge-host", got)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	item, err := c.Poll(context.Background(), time.Millisecond)
+	item, err := c.Poll(context.Background(), time.Millisecond, PollRequest{
+		EdgeVersion: "v9.9.9",
+		Hostname:    "edge-host",
+	})
 	if err != nil {
 		t.Fatalf("Poll: %v", err)
 	}
@@ -114,7 +124,7 @@ func TestPollWithWork(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	item, err := c.Poll(context.Background(), time.Millisecond)
+	item, err := c.Poll(context.Background(), time.Millisecond, PollRequest{})
 	if err != nil {
 		t.Fatalf("Poll: %v", err)
 	}
@@ -137,7 +147,7 @@ func TestPollSendsBearerToken(t *testing.T) {
 
 	c := NewClient(srv.URL)
 	c.SetToken("tok123")
-	if _, err := c.Poll(context.Background(), time.Millisecond); err != nil {
+	if _, err := c.Poll(context.Background(), time.Millisecond, PollRequest{}); err != nil {
 		t.Fatalf("Poll: %v", err)
 	}
 }

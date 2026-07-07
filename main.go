@@ -210,15 +210,25 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, key, name, hostname s
 }
 
 // pollLoop is the daemon's heart: long-poll, run, repeat, until the context is
-// canceled. Transient poll errors back off briefly rather than spinning.
+// canceled. Transient poll errors back off briefly rather than spinning. Every
+// poll re-reports the edge's current facts so the control plane's view tracks
+// this build/host across restarts (they're constant within a process, so we
+// gather them once).
 func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 	const backoff = 5 * time.Second
+	hostname, _ := os.Hostname()
+	poll := PollRequest{
+		ProtocolVersion: EdgeProtocolVersion,
+		EdgeVersion:     Version,
+		Hostname:        hostname,
+		SystemInfo:      gatherSystemInfo(),
+	}
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		item, err := clt.Poll(ctx, cfg.PollHold)
+		item, err := clt.Poll(ctx, cfg.PollHold, poll)
 		if err != nil {
 			if ctx.Err() != nil {
 				return

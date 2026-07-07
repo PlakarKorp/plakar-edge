@@ -172,6 +172,7 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, key, name, hostname s
 			Hostname:        hostname,
 			ProtocolVersion: EdgeProtocolVersion,
 			EdgeVersion:     Version,
+			SystemInfo:      gatherSystemInfo(),
 		})
 		if err != nil {
 			// A 4xx is a definitive rejection (bad key, name taken, bad

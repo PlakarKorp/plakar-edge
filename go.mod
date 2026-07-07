@@ -3,20 +3,23 @@ module github.com/PlakarKorp/plakar-edge
 go 1.25.5
 
 require (
-	github.com/PlakarKorp/plaklet v0.0.0-20260707003613-6c9c212cf49e
+	github.com/PlakarKorp/plaklet v0.0.0-20260707015712-9bb8f7b1cb88
 	github.com/google/uuid v1.6.0
+	github.com/shirou/gopsutil/v4 v4.26.6
 )
 
 require (
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
+	github.com/PlakarKorp/integration-grpc v1.1.0-rc.5.0.20260609083250-a4652c3f4219 // indirect
 	github.com/PlakarKorp/integrations/fs v1.1.2 // indirect
 	github.com/PlakarKorp/integrations/http v1.1.1 // indirect
 	github.com/PlakarKorp/integrations/ptar v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/stdio v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/tar v1.1.0 // indirect
 	github.com/PlakarKorp/kloset v1.2.0-alpha.4 // indirect
+	github.com/PlakarKorp/pkg v1.1.2 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -59,7 +62,6 @@ require (
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/tink-crypto/tink-go/v2 v2.6.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
@@ -68,6 +70,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.37.0 // indirect
@@ -75,7 +78,9 @@ require (
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/grpc v1.81.1 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

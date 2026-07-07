@@ -23,11 +23,12 @@ import (
 const EdgeProtocolVersion = 1
 
 type EnrollRequest struct {
-	EnrollmentKey   string `json:"enrollment_key"`
-	Name            string `json:"name"`
-	Hostname        string `json:"hostname"`
-	ProtocolVersion int    `json:"protocol_version"`
-	EdgeVersion     string `json:"edge_version"`
+	EnrollmentKey   string     `json:"enrollment_key"`
+	Name            string     `json:"name"`
+	Hostname        string     `json:"hostname"`
+	ProtocolVersion int        `json:"protocol_version"`
+	EdgeVersion     string     `json:"edge_version"`
+	SystemInfo      SystemInfo `json:"system_info"`
 }
 
 type EnrollResponse struct {

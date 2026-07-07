@@ -16,6 +16,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -163,9 +164,13 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, key, name, hostname s
 			EdgeVersion:     Version,
 		})
 		if err != nil {
-			// A 4xx is a definitive rejection (bad key, bad request): fatal.
+			// A 4xx is a definitive rejection (bad key, name taken, bad
+			// request): retrying it will never succeed, so exit fatally.
 			var he *HTTPError
 			if errors.As(err, &he) && he.Status >= 400 && he.Status < 500 {
+				if he.Status == http.StatusConflict {
+					fatal("enrollment rejected: %v; choose a different -name or remove the existing edge", err)
+				}
 				fatal("enrollment rejected: %v", err)
 			}
 			// Otherwise transient (control plane down/starting, 5xx, network):

@@ -62,6 +62,15 @@ plakar-edge \
 To execute a task the daemon re-execs itself as `plakar-edge plaklet …`; no
 external binary is needed.
 
+### Connector packages
+
+The embedded plaklet needs a connector package (s3, sftp, …) for each source and
+target it backs up. The edge is assumed to have no network access beyond the
+control plane, so when a task names a connector the edge doesn't have, it fetches
+that package **for its own GOOS/GOARCH through the control plane** — plakman
+proxies it from the plugin feed. Packages are cached under `<pkg>/integrations`
+and reused, so each is downloaded only once.
+
 After the first successful enrollment the token is stored under `-state-dir`;
 subsequent restarts resume with it and `-enrollment-key` is no longer required.
 If the control plane is unreachable at first boot, enrollment retries with

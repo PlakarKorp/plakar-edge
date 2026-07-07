@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 
 	"github.com/google/uuid"
 )
@@ -20,6 +22,14 @@ import (
 func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	log.Printf("running work %s (%s)", item.WorkId, item.Op)
 
+	// Make sure the connector packages this work item needs are present, fetching
+	// any that are missing through the control-plane proxy.
+	if err := ensurePackages(ctx, clt, cfg, item); err != nil {
+		log.Printf("work %s failed: %v", item.WorkId, err)
+		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
+		return
+	}
+
 	err := spawnPlaklet(ctx, clt, cfg, item)
 	if err != nil {
 		log.Printf("work %s failed: %v", item.WorkId, err)
@@ -30,6 +40,42 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 		return
 	}
 	// spawnPlaklet forwards plaklet's own terminal reply; nothing else to do.
+}
+
+// ensurePackages fetches, through the control-plane proxy, any connector package
+// named by the work item's source/target that is not already present in the
+// edge's integrations dir. Packages are cached there and reused across runs.
+func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {
+	intdir := cfg.plakletPkgDir()
+	if err := os.MkdirAll(intdir, 0o755); err != nil {
+		return fmt.Errorf("cannot create integrations dir: %w", err)
+	}
+
+	seen := map[string]bool{}
+	for _, conf := range []*Configuration{item.Source, item.Target} {
+		if conf == nil || conf.Integration.Name == "" {
+			continue
+		}
+		name, version := conf.Integration.Name, conf.Integration.Version
+		key := name + "@" + version
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		filename := fmt.Sprintf("%s_%s_%s_%s.ptar", name, version, runtime.GOOS, runtime.GOARCH)
+		dst := filepath.Join(intdir, filename)
+		if _, err := os.Stat(dst); err == nil {
+			continue // already present
+		}
+
+		log.Printf("fetching connector package %s (%s/%s) via control plane", key, runtime.GOOS, runtime.GOARCH)
+		if err := clt.FetchPackage(ctx, name, version, runtime.GOOS, runtime.GOARCH, dst); err != nil {
+			return fmt.Errorf("failed to fetch package %s: %w", key, err)
+		}
+		log.Printf("installed %s", filename)
+	}
+	return nil
 }
 
 func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {

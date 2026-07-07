@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -71,6 +73,49 @@ func (c *Client) Reply(ctx context.Context, workID uuid.UUID, reply Reply) error
 	path := fmt.Sprintf("/api/v1/edge/%s/reply", workID)
 	_, err := c.doStatus(ctx, http.MethodPost, path, reply, nil)
 	return err
+}
+
+// FetchPackage downloads a connector package for the given name/version and the
+// edge's own platform, through the control-plane proxy, and writes it to dst.
+// The edge is assumed to have no network access beyond the control plane.
+func (c *Client) FetchPackage(ctx context.Context, name, version, goos, goarch, dst string) error {
+	path := fmt.Sprintf("/api/v1/edge/packages/%s/%s?os=%s&arch=%s",
+		url.PathEscape(name), url.PathEscape(version), url.QueryEscape(goos), url.QueryEscape(goarch))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return err
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return &HTTPError{Status: resp.StatusCode, msg: fmt.Sprintf("fetch package %s@%s: %s: %s", name, version, resp.Status, strings.TrimSpace(string(msg)))}
+	}
+
+	// Write atomically: download to a temp file, then rename into place, so a
+	// partial download can never be mistaken for an installed package.
+	tmp := dst + ".part"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, dst)
 }
 
 func (c *Client) doStatus(ctx context.Context, method, path string, body, out any) (int, error) {

@@ -99,12 +99,22 @@ func main() {
 	flag.StringVar(&enrollmentKey, "enrollment-key", "", "enrollment key (required on first run)")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
-	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (expects <pkg>/integrations and <pkg>/cache)")
+	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
 	flag.Parse()
 
 	if cfg.APIURL == "" {
 		fatal("-api-url is required")
+	}
+
+	// Default the package dir under the state dir, and make it absolute so the
+	// dir the daemon fetches into is the same one the spawned plaklet loads from
+	// regardless of working directory.
+	if cfg.PkgDir == "" {
+		cfg.PkgDir = filepath.Join(cfg.StateDir, "pkg")
+	}
+	if abs, err := filepath.Abs(cfg.PkgDir); err == nil {
+		cfg.PkgDir = abs
 	}
 
 	hostname, _ := os.Hostname()

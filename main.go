@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/PlakarKorp/plaklet"
 )
 
 // Version is the plakar-edge build version, reported to the control plane at
@@ -77,6 +79,14 @@ func saveState(c *Config, s *state) error {
 }
 
 func main() {
+	// plakar-edge is a multi-call binary: `plakar-edge plaklet <args>` runs the
+	// embedded plaklet executor (the same code the standalone plaklet binary
+	// runs). This is how the edge executes tasks — it re-execs itself with this
+	// subcommand rather than shelling out to a separate binary.
+	if len(os.Args) > 1 && os.Args[1] == "plaklet" {
+		os.Exit(plaklet.Main(os.Args[2:]))
+	}
+
 	var cfg Config
 	var enrollmentKey, name string
 
@@ -84,7 +94,9 @@ func main() {
 	flag.StringVar(&enrollmentKey, "enrollment-key", "", "enrollment key (required on first run)")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
-	flag.StringVar(&cfg.PlakletBin, "plaklet-bin", "plaklet", "path to the plaklet binary")
+	// PlakletBin defaults to empty, meaning "re-exec myself with the plaklet
+	// subcommand". Set it only to run a separate/external plaklet binary.
+	flag.StringVar(&cfg.PlakletBin, "plaklet-bin", "", "path to an external plaklet binary (default: self)")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (expects <pkg>/integrations and <pkg>/cache)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
 	flag.Parse()

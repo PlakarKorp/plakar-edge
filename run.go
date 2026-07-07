@@ -33,8 +33,25 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 }
 
 func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {
-	args := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
-	cmd := exec.CommandContext(ctx, cfg.PlakletBin, args...)
+	plakletArgs := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
+
+	// Default path: re-exec this same binary with the "plaklet" subcommand, so
+	// the embedded executor runs. Only use an external binary if -plaklet-bin was
+	// set explicitly.
+	name := cfg.PlakletBin
+	var args []string
+	if name == "" {
+		self, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("cannot locate own executable to run plaklet: %w", err)
+		}
+		name = self
+		args = append([]string{"plaklet"}, plakletArgs...)
+	} else {
+		args = plakletArgs
+	}
+
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()

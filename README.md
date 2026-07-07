@@ -40,11 +40,13 @@ the work item, so the edge does not need secret-manager plugins.
 ## Build
 
 ```sh
-go build -o plakar-edge .
+make            # or: go build -o plakar-edge .
 ```
 
-The edge spawns `plaklet`, so that binary and its integration plugins must be
-available on the edge host.
+`plakar-edge` is a **single self-contained binary**. It embeds the
+[plaklet](https://github.com/PlakarKorp/plaklet) executor (pinned in `go.mod`)
+and runs it as a subcommand — `plakar-edge plaklet <args>` — so there is no
+separate `plaklet` binary to build or ship. Building the edge builds plaklet.
 
 ## Run
 
@@ -54,9 +56,12 @@ plakar-edge \
   -enrollment-key <key from the control plane> \
   -name           edge-paris-1 \
   -state-dir      /var/lib/plakar-edge \
-  -plaklet-bin    /usr/local/bin/plaklet \
   -pkg            /var/lib/plakar-edge/pkgs
 ```
+
+To execute a task the daemon re-execs itself as `plakar-edge plaklet …`; no
+external binary is needed. (You can still point `-plaklet-bin` at a separate
+plaklet binary to override this, e.g. for one built with extra connectors.)
 
 After the first successful enrollment the token is stored under `-state-dir`;
 subsequent restarts resume with it and `-enrollment-key` is no longer required.
@@ -67,7 +72,7 @@ subsequent restarts resume with it and `-enrollment-key` is no longer required.
 | `-enrollment-key` | | Enrollment key; required only on first boot |
 | `-name` | hostname | Edge name registered with the control plane |
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
-| `-plaklet-bin` | `plaklet` | Path to the `plaklet` binary |
+| `-plaklet-bin` | *(self)* | Path to an external plaklet binary; default re-execs self |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
 

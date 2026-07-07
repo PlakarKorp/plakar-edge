@@ -29,7 +29,7 @@ import (
 // Version is the plakar-edge build version, reported to the control plane at
 // enrollment for observability (not used for compatibility gating — that is the
 // protocol version). Override at build time with -ldflags "-X main.Version=...".
-var Version = "v0.1.0-devel"
+var Version = "v1.0.0"
 
 // Config holds everything the daemon needs at runtime.
 type Config struct {

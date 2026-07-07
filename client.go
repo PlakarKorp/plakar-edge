@@ -53,12 +53,12 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 // Poll long-polls for the next work item. Returns (nil, nil) on 204 (no work).
 // The control plane blocks the request server-side; we set a client timeout a
 // little longer than the expected server hold.
-func (c *Client) Poll(ctx context.Context, hold time.Duration) (*WorkItem, error) {
+func (c *Client) Poll(ctx context.Context, hold time.Duration, req PollRequest) (*WorkItem, error) {
 	ctx, cancel := context.WithTimeout(ctx, hold+30*time.Second)
 	defer cancel()
 
 	var item WorkItem
-	status, err := c.doStatus(ctx, http.MethodPost, "/api/v1/edge/poll", nil, &item)
+	status, err := c.doStatus(ctx, http.MethodPost, "/api/v1/edge/poll", req, &item)
 	if err != nil {
 		return nil, err
 	}

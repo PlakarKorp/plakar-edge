@@ -41,6 +41,17 @@ type EnrollResponse struct {
 	Supported       bool `json:"supported"`
 }
 
+// PollRequest is sent on every poll. Besides asking for work it re-reports the
+// facts that can change between boots (build version, protocol, hostname, system
+// info) so the control plane's view of this edge self-heals after an upgrade,
+// without a re-enrollment. Mirrors plakman's contract.EdgePollRequest.
+type PollRequest struct {
+	ProtocolVersion int        `json:"protocol_version"`
+	EdgeVersion     string     `json:"edge_version"`
+	Hostname        string     `json:"hostname"`
+	SystemInfo      SystemInfo `json:"system_info"`
+}
+
 type WorkItem struct {
 	WorkId     uuid.UUID         `json:"work_id"`
 	Op         string            `json:"op"`

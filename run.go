@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -20,26 +21,27 @@ import (
 // control plane. It always sends a terminal reply (success or failure) so the
 // forwarder on the control-plane side unblocks.
 func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
-	log.Printf("running work %s (%s)", item.WorkId, item.Op)
+	start := time.Now()
+	log.Printf("work %s (%s) started", item.WorkId, item.Op)
 
 	// Make sure the connector packages this work item needs are present, fetching
 	// any that are missing through the control-plane proxy.
 	if err := ensurePackages(ctx, clt, cfg, item); err != nil {
-		log.Printf("work %s failed: %v", item.WorkId, err)
+		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
 		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
 		return
 	}
 
-	err := spawnPlaklet(ctx, clt, cfg, item)
-	if err != nil {
-		log.Printf("work %s failed: %v", item.WorkId, err)
+	if err := spawnPlaklet(ctx, clt, cfg, item); err != nil {
+		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
 		_ = clt.Reply(ctx, item.WorkId, Reply{
 			Type:    ReplyFailure,
 			Message: err.Error(),
 		})
 		return
 	}
-	// spawnPlaklet forwards plaklet's own terminal reply; nothing else to do.
+	// spawnPlaklet forwarded plaklet's own terminal (success) reply.
+	log.Printf("work %s (%s) succeeded in %s", item.WorkId, item.Op, time.Since(start))
 }
 
 // ensurePackages fetches, through the control-plane proxy, any connector package

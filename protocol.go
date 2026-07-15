@@ -105,6 +105,8 @@ type Configuration struct {
 	Fields      []ConfigurationField `json:"fields"`
 	Environment string               `json:"environment,omitempty"`
 	DataClasses []string             `json:"data_classes,omitempty"`
+	URN         string               `json:"urn,omitempty"`
+	URNID       uuid.UUID            `json:"urnid,omitempty"`
 }
 
 // ---- plaklet stdin/stdout protocol ----

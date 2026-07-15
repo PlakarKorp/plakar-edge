@@ -3,7 +3,7 @@ module github.com/PlakarKorp/plakar-edge
 go 1.25.5
 
 require (
-	github.com/PlakarKorp/plaklet v1.1.0
+	github.com/PlakarKorp/plaklet v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/shirou/gopsutil/v4 v4.26.6
 )

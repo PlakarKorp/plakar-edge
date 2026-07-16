@@ -44,6 +44,11 @@ type Config struct {
 	// <PkgDir>/cache, matching how the control-plane executor drives plaklet.
 	PkgDir   string
 	PollHold time.Duration
+	// Listen is the address (host:port) for the supervision HTTP server that
+	// serves /health, /ready and, when enabled, /metrics. Empty disables it.
+	Listen string
+	// Metrics enables the node-exporter /metrics endpoint on the Listen address.
+	Metrics bool
 }
 
 // plakletPkgDir and plakletCacheDir derive the paths plaklet expects from the
@@ -101,6 +106,8 @@ func main() {
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
+	flag.StringVar(&cfg.Listen, "listen", "127.0.0.1:9877", "address for the supervision HTTP server (/health, /ready, /metrics); empty disables it")
+	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
 	flag.Parse()
 
 	if cfg.APIURL == "" {
@@ -124,6 +131,16 @@ func main() {
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Bring up the supervision + metrics server early so /health answers while
+	// the edge is still enrolling. It reports live immediately and flips to
+	// ready once the poll loop starts.
+	hlth, shutdownServer := startServer(rootCtx, serverConfig{Addr: cfg.Listen, Metrics: cfg.Metrics})
+	defer func() {
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownServer(shutCtx)
+	}()
 
 	clt := NewClient(cfg.APIURL)
 
@@ -152,8 +169,12 @@ func main() {
 
 	clt.SetToken(st.Token)
 
+	// Enrolled and about to poll: the edge is ready to be dispatched work.
+	hlth.setReady(true)
+
 	log.Printf("edge %s online, polling %s", st.EdgeId, cfg.APIURL)
 	pollLoop(rootCtx, clt, &cfg)
+	hlth.setReady(false)
 	log.Printf("edge %s shutting down", st.EdgeId)
 }
 

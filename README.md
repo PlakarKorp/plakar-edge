@@ -85,7 +85,34 @@ likewise retries through control-plane outages.
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
-| `-poll-hold` | `30s` | Expected server-side long-poll hold |
+| `-listen` | `127.0.0.1:9877` | Address for the supervision HTTP server (`/health`, `/ready`, `/metrics`); empty disables it |
+| `-metrics` | `true` | Expose node-exporter metrics at `/metrics` on the `-listen` address |
+
+## Supervision & metrics
+
+The edge runs a small HTTP server on `-listen` for supervision and monitoring.
+It binds to loopback by default; set `-listen` to `0.0.0.0:9877` (or empty to
+disable) as your deployment requires.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/health` | **Liveness** — `200` as long as the process is serving. Fail → restart the daemon. |
+| `/ready` | **Readiness** — `200` only once the edge is enrolled and polling, `503` otherwise. Gates whether the edge is expected to pick up work. |
+| `/metrics` | **Node exporter** — host metrics (CPU, memory, filesystem, network, load, …) via the upstream [`node_exporter`](https://github.com/prometheus/node_exporter) collectors, plus the standard Go runtime/process collectors. Scrape it with Prometheus. |
+
+`/health` and `/ready` return a small JSON body:
+
+```json
+{ "status": "ok", "version": "v1.0.0", "uptime_seconds": 42.7 }
+```
+
+A typical systemd/process supervisor uses `/health` to decide whether to
+restart the unit; a Prometheus deployment scrapes `/metrics`; and an
+orchestrator that fans work out to edges can consult `/ready`.
+
+> Note: the node-exporter collectors are the upstream ones. Most are richest on
+> Linux; on other platforms unsupported collectors simply report a per-collector
+> `node_scrape_collector_success 0` and are skipped, without failing the scrape.
 
 ## Wire protocol
 

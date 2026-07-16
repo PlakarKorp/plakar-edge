@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "plakar-edge.fullname" . }}
+  labels:
+    {{- include "plakar-edge.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "plakar-edge.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "plakar-edge.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "plakar-edge.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "plakar-edge.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: plakar-edge
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -control-plane
+            - {{ required "controlPlane is required (control plane API base URL)" .Values.controlPlane | quote }}
+            - -state-dir
+            - {{ .Values.persistence.mountPath }}/state
+            - -pkg
+            - {{ .Values.persistence.mountPath }}/pkg
+            {{- if .Values.pollHold }}
+            - -poll-hold
+            - {{ .Values.pollHold | quote }}
+            {{- end }}
+          env:
+            - name: PLAKAR_EDGE_ENROLL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "enrollKey.secretName is required (name of the Secret holding the enrollment key)" .Values.enrollKey.secretName }}
+                  key: {{ .Values.enrollKey.secretKey }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}

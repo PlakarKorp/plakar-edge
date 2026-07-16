@@ -1,0 +1,9 @@
+apiVersion: v2
+name: plakar-edge
+description: A Helm chart deploying plakar-edge as a StatefulSet of daemonized executors enrolling against a plakman control plane
+type: application
+version: 0.1.0
+appVersion: "latest"
+home: https://github.com/PlakarKorp/plakar-edge
+sources:
+  - https://github.com/PlakarKorp/plakar-edge

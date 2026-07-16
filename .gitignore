@@ -1,3 +1,6 @@
 /plakar-edge
 *.local.yaml
 .DS_Store
+
+# packaged helm charts (e.g. from `helm package`)
+*.tgz

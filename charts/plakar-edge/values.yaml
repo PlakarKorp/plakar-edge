@@ -1,0 +1,66 @@
+# -- Number of edges to run. Each replica enrolls as its own distinct edge,
+# with its own stable name (defaults to its pod hostname, e.g. plakar-edge-0)
+# and its own persisted identity/state.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/plakarkorp/plakar-edge
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag. Defaults to the chart's appVersion; the
+  # publish workflow tags images as "latest" and "<sha>-<run_id>", so this
+  # usually wants to be set explicitly for anything but a floating deploy.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Control plane API base URL, passed as -control-plane. Required.
+controlPlane: ""
+
+# -- How long the server holds a poll open, passed as -poll-hold. Leave empty
+# to use the binary's own default (30s).
+pollHold: ""
+
+# -- Enrollment key is never set here. The chart expects a Secret to already
+# exist (see charts/plakar-edge/README.md) and only references it, so the key
+# never ends up in `helm history`/rendered manifests/values.
+enrollKey:
+  # -- Name of an existing Secret containing the enrollment key.
+  secretName: ""
+  # -- Key within that Secret holding the enrollment key.
+  secretKey: enroll-key
+
+serviceAccount:
+  # -- Specifies whether a service account should be created.
+  create: true
+  # -- Annotations to add to the service account.
+  annotations: {}
+  # -- The name of the service account to use. If not set and create is
+  # true, a name is generated using the fullname template.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+persistence:
+  # -- Size of the per-replica PersistentVolumeClaim holding edge state and
+  # plaklet packages.
+  size: 5Gi
+  # -- StorageClass for the PVC. Leave empty to use the cluster default.
+  storageClassName: ""
+  # -- Path inside the container where the PVC is mounted. -state-dir and
+  # -pkg are both passed as subdirectories of this mount.
+  mountPath: /data

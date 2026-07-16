@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "plakar-edge.fullname" . }}
+  labels:
+    {{- include "plakar-edge.labels" . | nindent 4 }}
+spec:
+  # plakar-edge has no listening port of its own - it only makes outbound
+  # long-poll calls to the control plane. This headless Service exists
+  # purely to satisfy the StatefulSet's required serviceName, giving each
+  # pod a stable DNS identity.
+  clusterIP: None
+  selector:
+    {{- include "plakar-edge.selectorLabels" . | nindent 4 }}

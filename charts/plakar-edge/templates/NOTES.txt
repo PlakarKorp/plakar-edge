@@ -1,0 +1,21 @@
+plakar-edge has been deployed as a StatefulSet ({{ .Values.replicaCount }} replica(s)):
+
+  {{ include "plakar-edge.fullname" . }}-0 .. {{ include "plakar-edge.fullname" . }}-{{ sub .Values.replicaCount 1 }}
+
+Each pod is an independent edge with its own persisted identity under
+{{ .Values.persistence.mountPath }}/state and its own plaklet package cache
+under {{ .Values.persistence.mountPath }}/pkg.
+
+plakar-edge has no listening port and nothing to curl - it only makes
+outbound calls to the control plane at:
+
+  {{ .Values.controlPlane }}
+
+Check enrollment/poll status via logs, e.g. for the first replica:
+
+  kubectl logs -n {{ .Release.Namespace }} -f {{ include "plakar-edge.fullname" . }}-0
+
+On first boot each pod enrolls using the key in Secret
+"{{ .Values.enrollKey.secretName }}" (key: {{ .Values.enrollKey.secretKey }})
+and persists the resulting token to its own PVC; the enrollment key is not
+required again unless that PVC is lost.

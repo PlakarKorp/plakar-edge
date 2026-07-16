@@ -6,9 +6,11 @@ replicaCount: 1
 image:
   repository: ghcr.io/plakarkorp/plakar-edge
   pullPolicy: IfNotPresent
-  # -- Overrides the image tag. Defaults to the chart's appVersion; the
-  # publish workflow tags images as "latest" and "<sha>-<run_id>", so this
-  # usually wants to be set explicitly for anything but a floating deploy.
+  # -- Overrides the image tag. Defaults to the chart's appVersion, which for
+  # a chart released via the publish workflow (oci://.../plakar-edge --version
+  # X.Y.Z) already matches the image actually pushed for that release
+  # (ghcr.io/plakarkorp/plakar-edge:vX.Y.Z). Override for a floating deploy
+  # (e.g. "latest" or a "<sha>-<run_id>" build).
   tag: ""
 
 imagePullSecrets: []

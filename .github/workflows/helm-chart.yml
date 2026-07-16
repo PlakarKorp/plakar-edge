@@ -1,0 +1,49 @@
+name: publish helm chart
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: chart/app version to publish (without leading v)
+        required: true
+
+jobs:
+  push:
+    name: push helm chart to the OCI registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
+      - name: set up helm
+        uses: azure/setup-helm@v4
+
+      - name: resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: package chart
+        run: |
+          helm package charts/plakar-edge \
+            --version "${{ steps.version.outputs.value }}" \
+            --app-version "${{ steps.version.outputs.value }}" \
+            --destination dist
+
+      - name: login to ghcr.io
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username ${{ github.actor }} --password-stdin
+
+      - name: push chart
+        run: helm push dist/plakar-edge-*.tgz oci://ghcr.io/plakarkorp/charts

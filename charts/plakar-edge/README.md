@@ -29,6 +29,12 @@ manifests.
 
 ## Install
 
+`image.tag` can be omitted when installing a chart version published by the
+release workflow (e.g. `helm install my-edges oci://ghcr.io/plakarkorp/charts/plakar-edge --version X.Y.Z`) -
+the default already points at the matching `vX.Y.Z` image. It's shown
+explicitly below for a local/dev install, which otherwise has no release
+version to derive it from:
+
 ```sh
 helm install my-edges ./charts/plakar-edge \
   --set controlPlane=https://plakman.example.com \
@@ -43,7 +49,7 @@ helm install my-edges ./charts/plakar-edge \
 |-----|---------|--------------|
 | `replicaCount` | `1` | Number of edges to run |
 | `image.repository` | `ghcr.io/plakarkorp/plakar-edge` | Image repository |
-| `image.tag` | `""` (falls back to `Chart.AppVersion`) | Image tag |
+| `image.tag` | `""` (falls back to `Chart.AppVersion`, which matches the `vX.Y.Z` image pushed for a released chart version) | Image tag |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
 | `controlPlane` | `""` | Control plane API base URL (required) |
 | `pollHold` | `""` | `-poll-hold`; empty uses the binary's own default |

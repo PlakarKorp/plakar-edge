@@ -27,17 +27,24 @@ jobs:
       - name: resolve version
         id: version
         run: |
+          # Chart version must be clean semver (no "v" prefix). App version
+          # tracks the image tag docker/build-push-action actually pushes
+          # (ghcr.io/plakarkorp/plakar-edge:<git ref name>, "v" kept), so the
+          # chart's default image.tag resolves to a real, existing image.
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            INPUT="${{ github.event.inputs.version }}"
+            echo "chart=${INPUT#v}" >> "$GITHUB_OUTPUT"
+            echo "app=${INPUT}" >> "$GITHUB_OUTPUT"
           else
-            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "chart=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "app=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: package chart
         run: |
           helm package charts/plakar-edge \
-            --version "${{ steps.version.outputs.value }}" \
-            --app-version "${{ steps.version.outputs.value }}" \
+            --version "${{ steps.version.outputs.chart }}" \
+            --app-version "${{ steps.version.outputs.app }}" \
             --destination dist
 
       - name: login to ghcr.io

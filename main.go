@@ -49,6 +49,10 @@ type Config struct {
 	Listen string
 	// Metrics enables the node-exporter /metrics endpoint on the Listen address.
 	Metrics bool
+	// Tags are freeform "key=value" strings this edge self-reports on every
+	// poll, letting the control plane target it by tag match. Parsed from
+	// -tags once at startup; changing them requires a restart.
+	Tags []string
 }
 
 // plakletPkgDir and plakletCacheDir derive the paths plaklet expects from the
@@ -98,7 +102,7 @@ func main() {
 	}
 
 	var cfg Config
-	var enrollmentKey, name string
+	var enrollmentKey, name, rawTags string
 
 	flag.StringVar(&cfg.APIURL, "control-plane", "", "plakman control plane API base URL (required)")
 	flag.StringVar(&enrollmentKey, "enroll", "", "enrollment key (required on first run), defaults to PLAKAR_EDGE_ENROLL_KEY if not defined.")
@@ -108,7 +112,10 @@ func main() {
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
 	flag.StringVar(&cfg.Listen, "listen", "127.0.0.1:9877", "address for the supervision HTTP server (/health, /ready, /metrics); empty disables it")
 	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
+	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod)")
 	flag.Parse()
+
+	cfg.Tags = parseTags(rawTags)
 
 	if cfg.APIURL == "" {
 		fatal("-control-plane is required")
@@ -249,6 +256,7 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 		EdgeVersion:     Version,
 		Hostname:        hostname,
 		SystemInfo:      gatherSystemInfo(),
+		Tags:            cfg.Tags,
 	}
 	for {
 		if ctx.Err() != nil {

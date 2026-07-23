@@ -127,6 +127,35 @@ func TestReplyOmitsEmptyOptionalFields(t *testing.T) {
 	}
 }
 
+func TestPollRequestOmitsEmptyTags(t *testing.T) {
+	buf, err := json.Marshal(PollRequest{EdgeVersion: "v1.0.0"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(buf, &raw); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, ok := raw["tags"]; ok {
+		t.Errorf("tags should be omitted when nil, got %+v", raw)
+	}
+}
+
+func TestPollRequestIncludesTagsWhenSet(t *testing.T) {
+	buf, err := json.Marshal(PollRequest{Tags: []string{"role=ingest", "env=prod"}})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got PollRequest
+	if err := json.Unmarshal(buf, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	want := []string{"role=ingest", "env=prod"}
+	if len(got.Tags) != len(want) || got.Tags[0] != want[0] || got.Tags[1] != want[1] {
+		t.Errorf("Tags round-trip = %+v, want %+v", got.Tags, want)
+	}
+}
+
 func TestReplyTypeConstants(t *testing.T) {
 	types := map[ReplyType]string{
 		ReplyInfo:    "info",

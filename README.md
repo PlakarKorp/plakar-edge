@@ -87,6 +87,7 @@ likewise retries through control-plane outages.
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
 | `-listen` | `127.0.0.1:9877` | Address for the supervision HTTP server (`/health`, `/ready`, `/metrics`); empty disables it |
 | `-metrics` | `true` | Expose node-exporter metrics at `/metrics` on the `-listen` address |
+| `-tags` | | Comma-separated `key=value` tags self-reported to the control plane on every poll (e.g. `role=ingest,env=prod`), letting it target this edge by tag match |
 
 ## Supervision & metrics
 

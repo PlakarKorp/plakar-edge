@@ -170,6 +170,26 @@ func TestPollLoopContinuesOnNilItem(t *testing.T) {
 	}
 }
 
+func TestPollLoopSendsConfiguredTags(t *testing.T) {
+	var got PollRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	pollLoop(ctx, c, &Config{PollHold: time.Millisecond, Tags: []string{"role=ingest", "env=prod"}})
+
+	want := []string{"role=ingest", "env=prod"}
+	if len(got.Tags) != len(want) || got.Tags[0] != want[0] || got.Tags[1] != want[1] {
+		t.Errorf("poll body Tags = %+v, want %+v", got.Tags, want)
+	}
+}
+
 func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 	var pollCount int32
 	var gotReply Reply

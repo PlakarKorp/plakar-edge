@@ -43,13 +43,16 @@ type EnrollResponse struct {
 
 // PollRequest is sent on every poll. Besides asking for work it re-reports the
 // facts that can change between boots (build version, protocol, hostname, system
-// info) so the control plane's view of this edge self-heals after an upgrade,
-// without a re-enrollment. Mirrors plakman's contract.EdgePollRequest.
+// info, tags) so the control plane's view of this edge self-heals after an
+// upgrade, a host change, or a retag, without a re-enrollment. Mirrors
+// plakman's contract.EdgePollRequest. Tags is additive to the wire protocol:
+// an older plakman that doesn't know about it simply ignores the field.
 type PollRequest struct {
 	ProtocolVersion int        `json:"protocol_version"`
 	EdgeVersion     string     `json:"edge_version"`
 	Hostname        string     `json:"hostname"`
 	SystemInfo      SystemInfo `json:"system_info"`
+	Tags            []string   `json:"tags,omitempty"`
 }
 
 type WorkItem struct {

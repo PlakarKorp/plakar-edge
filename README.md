@@ -55,6 +55,7 @@ plakar-edge \
   -control-plane  https://plakman.example.com \
   -enroll         <key from the control plane> \
   -name           edge-paris-1 \
+  -tags           zone:paris-1 \
   -state-dir      /var/lib/plakar-edge \
   -pkg            /var/lib/plakar-edge/pkgs
 ```
@@ -87,7 +88,7 @@ likewise retries through control-plane outages.
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
 | `-listen` | `127.0.0.1:9877` | Address for the supervision HTTP server (`/health`, `/ready`, `/metrics`); empty disables it |
 | `-metrics` | `true` | Expose node-exporter metrics at `/metrics` on the `-listen` address |
-| `-tags` | | Comma-separated `key=value` tags self-reported to the control plane on every poll (e.g. `role=ingest,env=prod`), letting it target this edge by tag match |
+| `-tags` | | Comma-separated list of tags self-reported to the control plane on every poll (e.g. `env:prod,zone:eu-1`), letting it target this edge by tag match |
 
 ## Supervision & metrics
 

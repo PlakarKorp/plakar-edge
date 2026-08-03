@@ -42,6 +42,10 @@ spec:
             - -poll-hold
             - {{ .Values.pollHold | quote }}
             {{- end }}
+            {{- if .Values.tags }}
+            - -tags
+            - {{ .Values.tags | quote }}
+            {{- end }}
           env:
             - name: PLAKAR_EDGE_ENROLL_KEY
               valueFrom:

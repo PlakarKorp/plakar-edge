@@ -24,6 +24,12 @@ controlPlane: ""
 # to use the binary's own default (30s).
 pollHold: ""
 
+# -- Comma-separated list of tags this edge self-reports to the control
+# plane, passed as -tags (e.g. "env:prod,zone:eu-1"). Applies to every
+# replica in the StatefulSet identically -- there is no per-replica override.
+# Leave empty to report no tags.
+tags: ""
+
 # -- Enrollment key is never set here. The chart expects a Secret to already
 # exist (see charts/plakar-edge/README.md) and only references it, so the key
 # never ends up in `helm history`/rendered manifests/values.

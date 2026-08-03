@@ -53,6 +53,7 @@ helm install my-edges ./charts/plakar-edge \
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
 | `controlPlane` | `""` | Control plane API base URL (required) |
 | `pollHold` | `""` | `-poll-hold`; empty uses the binary's own default |
+| `tags` | `""` | `-tags`; comma-separated list of tags this edge self-reports to the control plane (e.g. `env:prod,zone:eu-1`), same value applied to every replica |
 | `enrollKey.secretName` | `""` | Name of an existing Secret with the enrollment key (required) |
 | `enrollKey.secretKey` | `enroll-key` | Key within that Secret |
 | `persistence.size` | `5Gi` | PVC size per replica |

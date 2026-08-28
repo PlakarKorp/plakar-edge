@@ -24,8 +24,9 @@ plakman control plane                          remote network
 └────────────────────┘                        └────────────────────────┘
 ```
 
-1. **Enroll** — on first boot the edge presents the control plane's enrollment
-   key and receives its own bearer token, which it persists under `-state-dir`.
+1. **Enroll** — on first boot the edge names the organization it is joining and
+   presents that organization's enrollment key, receiving its own bearer token,
+   which it persists under `-state-dir`.
 2. **Poll** — it long-polls `/edge/poll` for work. All traffic is
    edge-initiated, so the control plane never needs to reach into the remote
    network.
@@ -53,6 +54,7 @@ separate `plaklet` binary to build or ship. Building the edge builds plaklet.
 ```sh
 plakar-edge \
   -control-plane  https://plakman.example.com \
+  -organization   <organization id from the control plane> \
   -enroll         <key from the control plane> \
   -name           edge-paris-1 \
   -tags           zone:paris-1 \
@@ -73,7 +75,10 @@ proxies it from the plugin feed. Packages are cached under `<pkg>/integrations`
 and reused, so each is downloaded only once.
 
 After the first successful enrollment the token is stored under `-state-dir`;
-subsequent restarts resume with it and `-enroll` is no longer required. If the
+subsequent restarts resume with it and neither `-enroll` nor `-organization` is
+required. An enrollment key belongs to one organization, but the edge names it
+rather than letting the control plane look the key up: that lookup would put
+the secret in a query and lose the constant-time comparison. If the
 control plane is unreachable at first boot, enrollment retries with backoff until
 it succeeds (a rejected enrollment key is fatal). Once enrolled, the poll loop
 likewise retries through control-plane outages.
@@ -81,7 +86,8 @@ likewise retries through control-plane outages.
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `-control-plane` | *(required)* | Control plane API base URL |
-| `-enroll` | | Enrollment key; required only on first boot |
+| `-enroll` | | Enrollment key; required only on first boot. Falls back to `PLAKAR_EDGE_ENROLL_KEY` |
+| `-organization` | | Id of the organization to enroll into; required only on first boot. Falls back to `PLAKAR_EDGE_ORGANIZATION` |
 | `-name` | hostname | Edge name registered with the control plane |
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |

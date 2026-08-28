@@ -62,7 +62,7 @@ func TestEnrollRetriesThenSucceeds(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
-	st := enroll(context.Background(), NewClient(srv.URL), cfg, "key", "edge", "host")
+	st := enroll(context.Background(), NewClient(srv.URL), cfg, testOrg, "key", "edge", "host")
 	if st == nil {
 		t.Fatal("enroll returned nil (context not canceled, should have succeeded)")
 	}
@@ -89,7 +89,55 @@ func TestEnrollReturnsNilOnContextCancel(t *testing.T) {
 	defer cancel()
 
 	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
-	if st := enroll(ctx, NewClient(srv.URL), cfg, "key", "edge", "host"); st != nil {
+	if st := enroll(ctx, NewClient(srv.URL), cfg, testOrg, "key", "edge", "host"); st != nil {
 		t.Errorf("enroll = %+v, want nil on context cancel", st)
+	}
+}
+
+// testOrg is the organization the enrollment tests join.
+var testOrg = uuid.MustParse("11111111-2222-3333-4444-555555555555")
+
+// The organization reaches the control plane on the wire.
+//
+// plakman requires it and validates it as a uuid, so an edge that does not send
+// it is refused -- and the refusal is a 400 that reads like a bad key rather
+// than a missing field.
+func TestEnrollSendsTheOrganization(t *testing.T) {
+	var got EnrollRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(EnrollResponse{
+			EdgeId:    uuid.MustParse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+			Token:     "tok",
+			Supported: true,
+		})
+	}))
+	defer srv.Close()
+
+	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
+	if st := enroll(context.Background(), NewClient(srv.URL), cfg, testOrg, "key", "edge", "host"); st == nil {
+		t.Fatal("enroll returned nil, should have succeeded")
+	}
+	if got.OrganizationID != testOrg {
+		t.Errorf("organization_id = %v, want %v", got.OrganizationID, testOrg)
+	}
+	if got.EnrollmentKey != "key" {
+		t.Errorf("enrollment_key = %q, want key", got.EnrollmentKey)
+	}
+}
+
+// And it is spelled the way plakman reads it: the field is matched by json tag,
+// so a rename on either side is a silently absent organization.
+func TestEnrollRequestUsesTheAgreedFieldName(t *testing.T) {
+	raw, err := json.Marshal(EnrollRequest{OrganizationID: testOrg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m["organization_id"]; !ok {
+		t.Errorf("no organization_id in %s", raw)
 	}
 }

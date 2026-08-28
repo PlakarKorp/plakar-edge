@@ -23,6 +23,12 @@ import (
 const EdgeProtocolVersion = 1
 
 type EnrollRequest struct {
+	// OrganizationID is the organization this edge joins. Named rather than
+	// derived from the key: an enrollment key belongs to one organization, so
+	// the control plane could look it up by key -- but that would put the
+	// secret in a SQL predicate and lose the constant-time comparison, leaking
+	// key length and prefix through timing. An id is not a secret.
+	OrganizationID  uuid.UUID  `json:"organization_id"`
 	EnrollmentKey   string     `json:"enrollment_key"`
 	Name            string     `json:"name"`
 	Hostname        string     `json:"hostname"`

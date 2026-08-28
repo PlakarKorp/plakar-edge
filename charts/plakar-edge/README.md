@@ -38,6 +38,7 @@ version to derive it from:
 ```sh
 helm install my-edges ./charts/plakar-edge \
   --set controlPlane=https://plakman.example.com \
+  --set organization=<organization id from the control plane> \
   --set image.tag=<sha>-<run_id> \
   --set enrollKey.secretName=plakar-edge-enroll-key \
   --set replicaCount=3
@@ -54,6 +55,7 @@ helm install my-edges ./charts/plakar-edge \
 | `controlPlane` | `""` | Control plane API base URL (required) |
 | `pollHold` | `""` | `-poll-hold`; empty uses the binary's own default |
 | `tags` | `""` | `-tags`; comma-separated list of tags this edge self-reports to the control plane (e.g. `env:prod,zone:eu-1`), same value applied to every replica |
+| `organization` | `""` | Id of the organization these edges enroll into (required) |
 | `enrollKey.secretName` | `""` | Name of an existing Secret with the enrollment key (required) |
 | `enrollKey.secretKey` | `enroll-key` | Key within that Secret |
 | `persistence.size` | `5Gi` | PVC size per replica |

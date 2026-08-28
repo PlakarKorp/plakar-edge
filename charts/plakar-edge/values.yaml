@@ -20,6 +20,13 @@ fullnameOverride: ""
 # -- Control plane API base URL, passed as -control-plane. Required.
 controlPlane: ""
 
+# -- Id of the organization these edges enroll into, passed as -organization.
+# Required. An argument rather than part of the enrollment-key Secret: the key
+# belongs to one organization, but naming it is what lets the control plane
+# compare the key in constant time instead of looking it up by secret. An id is
+# not a secret.
+organization: ""
+
 # -- How long the server holds a poll open, passed as -poll-hold. Leave empty
 # to use the binary's own default (30s).
 pollHold: ""

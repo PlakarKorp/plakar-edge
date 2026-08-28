@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/PlakarKorp/plaklet"
+	"github.com/google/uuid"
 )
 
 // Version is the plakar-edge build version, reported to the control plane at
@@ -102,10 +103,11 @@ func main() {
 	}
 
 	var cfg Config
-	var enrollmentKey, name, rawTags string
+	var enrollmentKey, organizationID, name, rawTags string
 
 	flag.StringVar(&cfg.APIURL, "control-plane", "", "plakman control plane API base URL (required)")
 	flag.StringVar(&enrollmentKey, "enroll", "", "enrollment key (required on first run), defaults to PLAKAR_EDGE_ENROLL_KEY if not defined.")
+	flag.StringVar(&organizationID, "organization", "", "id of the organization to enroll into (required on first run), defaults to PLAKAR_EDGE_ORGANIZATION if not defined.")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
@@ -166,7 +168,26 @@ func main() {
 
 			enrollmentKey = p
 		}
-		st = enroll(rootCtx, clt, &cfg, enrollmentKey, name, hostname)
+		// An enrollment key belongs to one organization, but the edge names it
+		// rather than letting the control plane look it up: that lookup would
+		// put the secret in a query and lose the constant-time compare.
+		if organizationID == "" {
+			p, ok := os.LookupEnv("PLAKAR_EDGE_ORGANIZATION")
+			if !ok {
+				fatal("no persisted identity and neither of -organization" +
+					" or PLAKAR_EDGE_ORGANIZATION were provided")
+			}
+
+			organizationID = p
+		}
+		// Parsed here rather than sent as typed: a malformed id is a startup
+		// error naming the flag, not a 400 after a round trip that reads as the
+		// key being wrong.
+		orgID, err := uuid.Parse(organizationID)
+		if err != nil {
+			fatal("-organization is not a valid id: %v", err)
+		}
+		st = enroll(rootCtx, clt, &cfg, orgID, enrollmentKey, name, hostname)
 		if st == nil {
 			return // context canceled during enrollment (SIGTERM)
 		}
@@ -194,13 +215,15 @@ var enrollRetryDelay = 5 * time.Second
 // 5xx) until it succeeds or the context is canceled. A definitive rejection
 // (4xx — e.g. a wrong/absent enrollment key) is fatal: retrying it is pointless.
 // Returns nil only if the context is canceled before enrollment succeeds.
-func enroll(ctx context.Context, clt *Client, cfg *Config, key, name, hostname string) *state {
+func enroll(ctx context.Context, clt *Client, cfg *Config, orgID uuid.UUID, key, name, hostname string) *state {
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
-		log.Printf("enrolling as %q against %s (protocol v%d)", name, cfg.APIURL, EdgeProtocolVersion)
+		log.Printf("enrolling as %q into organization %s against %s (protocol v%d)",
+			name, orgID, cfg.APIURL, EdgeProtocolVersion)
 		resp, err := clt.Enroll(ctx, EnrollRequest{
+			OrganizationID:  orgID,
 			EnrollmentKey:   key,
 			Name:            name,
 			Hostname:        hostname,

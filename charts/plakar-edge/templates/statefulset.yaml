@@ -34,6 +34,8 @@ spec:
           args:
             - -control-plane
             - {{ required "controlPlane is required (control plane API base URL)" .Values.controlPlane | quote }}
+            - -organization
+            - {{ required "organization is required (id of the organization to enroll into)" .Values.organization | quote }}
             - -state-dir
             - {{ .Values.persistence.mountPath }}/state
             - -pkg

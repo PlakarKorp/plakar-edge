@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -130,9 +132,9 @@ func TestPollLoopStopsOnContextCancel(t *testing.T) {
 }
 
 func TestPollLoopBacksOffOnError(t *testing.T) {
-	var calls int
+	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("fail"))
 	}))
@@ -146,15 +148,15 @@ func TestPollLoopBacksOffOnError(t *testing.T) {
 
 	// With a 5s backoff and a 200ms context timeout, the loop should only get
 	// through its very first poll attempt before the context expires.
-	if calls != 1 {
-		t.Errorf("calls = %d, want 1 (backoff should prevent a second attempt within the timeout)", calls)
+	if got := calls.Load(); got != 1 {
+		t.Errorf("calls = %d, want 1 (backoff should prevent a second attempt within the timeout)", got)
 	}
 }
 
 func TestPollLoopContinuesOnNilItem(t *testing.T) {
-	var calls int32
+	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
@@ -165,15 +167,18 @@ func TestPollLoopContinuesOnNilItem(t *testing.T) {
 
 	pollLoop(ctx, c, &Config{PollHold: time.Millisecond})
 
-	if calls < 2 {
-		t.Errorf("calls = %d, want at least 2 (loop should keep polling on nil item)", calls)
+	if got := calls.Load(); got < 2 {
+		t.Errorf("calls = %d, want at least 2 (loop should keep polling on nil item)", got)
 	}
 }
 
 func TestPollLoopSendsConfiguredTags(t *testing.T) {
+	var mu sync.Mutex
 	var got PollRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		_ = json.NewDecoder(r.Body).Decode(&got)
+		mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
@@ -185,19 +190,131 @@ func TestPollLoopSendsConfiguredTags(t *testing.T) {
 	pollLoop(ctx, c, &Config{PollHold: time.Millisecond, Tags: []string{"role=ingest", "env=prod"}})
 
 	want := []string{"role=ingest", "env=prod"}
+	mu.Lock()
+	defer mu.Unlock()
 	if len(got.Tags) != len(want) || got.Tags[0] != want[0] || got.Tags[1] != want[1] {
 		t.Errorf("poll body Tags = %+v, want %+v", got.Tags, want)
 	}
 }
 
+// fakeSleepingPlaklet writes a fake plaklet binary that blocks until killed,
+// standing in for a long-running task.
+func fakeSleepingPlaklet(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake plaklet is a shell script")
+	}
+	script := filepath.Join(t.TempDir(), "fake-plaklet")
+	// exec, so the kill on context cancel hits sleep itself rather than
+	// leaving an orphan holding the stdout pipe open.
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec sleep 30\n"), 0o755); err != nil {
+		t.Fatalf("write fake plaklet: %v", err)
+	}
+	return script
+}
+
+// pollOnceThenCount serves one work item on the first poll and 204 afterwards,
+// returning a pointer to the poll counter.
+func pollOnceThenCount(t *testing.T) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var pollCount atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/edge/poll", func(w http.ResponseWriter, r *http.Request) {
+		if pollCount.Add(1) == 1 {
+			item := WorkItem{WorkId: uuid.New(), Op: "noop"}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(item)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv, &pollCount
+}
+
+func TestPollLoopPollsWhileTaskRuns(t *testing.T) {
+	script := fakeSleepingPlaklet(t)
+	srv, pollCount := pollOnceThenCount(t)
+
+	c := NewClient(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		pollLoop(ctx, c, &Config{
+			PollHold:    time.Millisecond,
+			PlakletBin:  script,
+			PkgDir:      t.TempDir(),
+			MaxParallel: 2,
+		})
+		close(done)
+	}()
+
+	// With two slots, the loop must issue a second poll while the first task
+	// is still sleeping.
+	deadline := time.After(2 * time.Second)
+	for pollCount.Load() < 2 {
+		select {
+		case <-deadline:
+			t.Fatal("no second poll while a task was running: work is not dispatched in parallel")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pollLoop did not return after cancel; in-flight task was not reaped")
+	}
+}
+
+func TestPollLoopBoundsParallelism(t *testing.T) {
+	script := fakeSleepingPlaklet(t)
+	srv, pollCount := pollOnceThenCount(t)
+
+	c := NewClient(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		// MaxParallel unset clamps to 1: the single slot is held by the
+		// sleeping task, so no further poll may happen.
+		pollLoop(ctx, c, &Config{
+			PollHold:   time.Millisecond,
+			PlakletBin: script,
+			PkgDir:     t.TempDir(),
+		})
+		close(done)
+	}()
+
+	time.Sleep(250 * time.Millisecond)
+	if got := pollCount.Load(); got != 1 {
+		t.Errorf("pollCount = %d, want 1 (a saturated edge must not poll for more work)", got)
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pollLoop did not return after cancel; in-flight task was not reaped")
+	}
+}
+
 func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
-	var pollCount int32
+	var pollCount atomic.Int32
+	var mu sync.Mutex
 	var gotReply Reply
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/edge/poll", func(w http.ResponseWriter, r *http.Request) {
-		pollCount++
-		if pollCount == 1 {
+		if pollCount.Add(1) == 1 {
 			item := WorkItem{WorkId: uuid.New(), Op: "noop"}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(item)
@@ -207,7 +324,9 @@ func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 	})
 	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
+			mu.Lock()
 			_ = json.NewDecoder(r.Body).Decode(&gotReply)
+			mu.Unlock()
 		}
 		w.WriteHeader(http.StatusOK)
 	})
@@ -222,6 +341,8 @@ func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 	// report a failure reply — enough to prove pollLoop dispatches the item.
 	pollLoop(ctx, c, &Config{PollHold: time.Millisecond, PlakletBin: "/nonexistent/plaklet-binary"})
 
+	mu.Lock()
+	defer mu.Unlock()
 	if gotReply.Type != ReplyFailure {
 		t.Errorf("gotReply.Type = %q, want %q", gotReply.Type, ReplyFailure)
 	}

@@ -7,7 +7,8 @@
 //   - On first boot it enrolls with the control-plane API URL + enrollment key,
 //     receiving a per-edge token which it persists under -state-dir.
 //   - Thereafter it long-polls /edge/poll for work, spawns the local plaklet to
-//     run each task, and streams plaklet's replies back to /edge/{work}/reply.
+//     run each task (up to -max-parallel tasks concurrently), and streams
+//     plaklet's replies back to /edge/{work}/reply.
 package main
 
 import (
@@ -20,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -45,6 +47,11 @@ type Config struct {
 	// <PkgDir>/cache, matching how the control-plane executor drives plaklet.
 	PkgDir   string
 	PollHold time.Duration
+	// MaxParallel bounds how many tasks this edge runs concurrently. The poll
+	// loop acquires a slot before polling, so a saturated edge stops asking
+	// for work instead of accepting items it cannot start yet. Values below 1
+	// are treated as 1.
+	MaxParallel int
 	// Listen is the address (host:port) for the supervision HTTP server that
 	// serves /health, /ready and, when enabled, /metrics. Empty disables it.
 	Listen string
@@ -112,6 +119,7 @@ func main() {
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
+	flag.IntVar(&cfg.MaxParallel, "max-parallel", 5, "maximum number of tasks to run concurrently")
 	flag.StringVar(&cfg.Listen, "listen", "127.0.0.1:9877", "address for the supervision HTTP server (/health, /ready, /metrics); empty disables it")
 	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
 	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod)")
@@ -266,11 +274,16 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, orgID uuid.UUID, key,
 	}
 }
 
-// pollLoop is the daemon's heart: long-poll, run, repeat, until the context is
-// canceled. Transient poll errors back off briefly rather than spinning. Every
-// poll re-reports the edge's current facts so the control plane's view tracks
-// this build/host across restarts (they're constant within a process, so we
-// gather them once).
+// pollLoop is the daemon's heart: long-poll, dispatch, repeat, until the
+// context is canceled. Work items run on their own goroutines, bounded by a
+// semaphore of cfg.MaxParallel slots. A slot is acquired *before* polling so a
+// saturated edge stops asking for work rather than accepting items it cannot
+// start — those stay queued for other edges. On shutdown the loop waits for
+// in-flight tasks: the canceled context kills their plaklet processes and each
+// runWork still sends a terminal reply. Transient poll errors back off briefly
+// rather than spinning. Every poll re-reports the edge's current facts so the
+// control plane's view tracks this build/host across restarts (they're
+// constant within a process, so we gather them once).
 func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 	const backoff = 5 * time.Second
 	hostname, _ := os.Hostname()
@@ -281,13 +294,25 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 		SystemInfo:      gatherSystemInfo(),
 		Tags:            cfg.Tags,
 	}
+
+	sem := make(chan struct{}, max(cfg.MaxParallel, 1))
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+
 		item, err := clt.Poll(ctx, cfg.PollHold, poll)
 		if err != nil {
+			<-sem
 			if ctx.Err() != nil {
 				return
 			}
@@ -308,11 +333,16 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			continue
 		}
 		if item == nil {
+			<-sem
 			continue // no work; poll again
 		}
 
-		// Run synchronously: one edge handles one task at a time for the PoC.
-		runWork(ctx, clt, cfg, item)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			runWork(ctx, clt, cfg, item)
+		}()
 	}
 }
 

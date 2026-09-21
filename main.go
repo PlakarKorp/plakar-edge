@@ -61,6 +61,12 @@ type Config struct {
 	// poll, letting the control plane target it by tag match. Parsed from
 	// -tags once at startup; changing them requires a restart.
 	Tags []string
+	// ScriptsDir is the directory pre/post-job hook scripts are run from
+	// (tasks name them in their config as hooks.pre_job / hooks.post_job).
+	// Empty (the default) means no script can run: a task naming a hook fails
+	// rather than running without it. Scripts are named by bare file name and
+	// are never resolved outside this directory.
+	ScriptsDir string
 }
 
 // plakletPkgDir and plakletCacheDir derive the paths plaklet expects from the
@@ -123,6 +129,7 @@ func main() {
 	flag.StringVar(&cfg.Listen, "listen", "127.0.0.1:9877", "address for the supervision HTTP server (/health, /ready, /metrics); empty disables it")
 	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
 	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod)")
+	flag.StringVar(&cfg.ScriptsDir, "scripts-dir", "", "directory containing the pre/post-job hook scripts tasks may name; empty (default) refuses every hook script")
 	flag.Parse()
 
 	cfg.Tags = parseTags(rawTags)
@@ -139,6 +146,15 @@ func main() {
 	}
 	if abs, err := filepath.Abs(cfg.PkgDir); err == nil {
 		cfg.PkgDir = abs
+	}
+
+	// Same reasoning for the scripts dir: hook scripts must resolve to the
+	// directory the operator named regardless of the daemon's working
+	// directory when a work item arrives.
+	if cfg.ScriptsDir != "" {
+		if abs, err := filepath.Abs(cfg.ScriptsDir); err == nil {
+			cfg.ScriptsDir = abs
+		}
 	}
 
 	hostname, _ := os.Hostname()

@@ -95,6 +95,23 @@ likewise retries through control-plane outages.
 | `-listen` | `127.0.0.1:9877` | Address for the supervision HTTP server (`/health`, `/ready`, `/metrics`); empty disables it |
 | `-metrics` | `true` | Expose node-exporter metrics at `/metrics` on the `-listen` address |
 | `-tags` | | Comma-separated list of tags self-reported to the control plane on every poll (e.g. `env:prod,zone:eu-1`), letting it target this edge by tag match |
+| `-scripts-dir` | | Directory holding the pre/post-job hook scripts tasks may name. Empty (the default) refuses every hook script |
+
+### Pre/post-job hook scripts
+
+A task authored on the control plane may name two scripts in its advanced
+settings: a **pre-job** script run before the job starts (quiesce a database,
+mount a snapshot) and a **post-job** script run after it finishes, success or
+failure (resume the database). The edge only ever runs scripts from
+`-scripts-dir`: the operator who populates that directory decides *what* can
+run, the task author only picks *which* by bare file name — paths are refused,
+and with no `-scripts-dir` every hook is refused.
+
+A pre-job script failure fails the work without running the job (or the
+post-job script). A post-job script failure fails an otherwise successful job —
+a database left frozen is not a success. Scripts receive `PLAKAR_WORK_ID`,
+`PLAKAR_OP` and `PLAKAR_HOOK` (`pre_job`/`post_job`) in their environment, and
+on failure the tail of their output is reported back to the control plane.
 
 ## Supervision & metrics
 

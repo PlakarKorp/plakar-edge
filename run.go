@@ -18,30 +18,81 @@ import (
 
 // runWork executes one work item by spawning the local plaklet, feeding it the
 // ExecPayload on stdin and forwarding every ExecReply it emits back to the
-// control plane. It always sends a terminal reply (success or failure) so the
+// control plane, wrapped in the pre/post-job hook scripts the task may name.
+// It always sends exactly one terminal reply (success or failure) so the
 // forwarder on the control-plane side unblocks.
 func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	start := time.Now()
 	log.Printf("work %s (%s) started", item.WorkId, item.Op)
 
+	fail := func(err error) {
+		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
+		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
+	}
+
 	// Make sure the connector packages this work item needs are present, fetching
 	// any that are missing through the control-plane proxy.
 	if err := ensurePackages(ctx, clt, cfg, item); err != nil {
-		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
-		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
+		fail(err)
 		return
 	}
 
-	if err := spawnPlaklet(ctx, clt, cfg, item); err != nil {
-		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
+	// The pre-job hook exists so the job does not run without it (quiesce a
+	// database, mount a snapshot): a failure aborts the work before plaklet
+	// starts, and the post-job hook is not run -- there is nothing to undo.
+	if err := runHook(ctx, cfg, item, "pre_job"); err != nil {
+		fail(fmt.Errorf("pre-job hook: %w", err))
+		return
+	}
+
+	// spawnPlaklet holds plaklet's terminal reply back instead of forwarding
+	// it, so the post-job hook runs -- and can still fail the work -- before
+	// the control plane is told the work is over.
+	terminal, plakletErr := spawnPlaklet(ctx, clt, cfg, item)
+
+	// The post-job hook is the pre-job hook's undo: once the pre-job hook ran,
+	// it runs whether plaklet succeeded, failed or died.
+	var postErr error
+	if err := runHook(ctx, cfg, item, "post_job"); err != nil {
+		postErr = fmt.Errorf("post-job hook: %w", err)
+	}
+
+	if plakletErr != nil {
+		if postErr != nil {
+			log.Printf("work %s: %v", item.WorkId, postErr)
+			forwardReply(ctx, clt, item.WorkId, ExecReply{Type: ReplyError, Message: postErr.Error()})
+		}
+		fail(plakletErr)
+		return
+	}
+
+	// Plaklet succeeded but its cleanup did not: the work failed -- a frozen
+	// database left frozen is not a success. The report/state plaklet
+	// produced still ride along, the backup itself is real.
+	if terminal.Type == ReplySuccess && postErr != nil {
+		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), postErr)
 		_ = clt.Reply(ctx, item.WorkId, Reply{
 			Type:    ReplyFailure,
-			Message: err.Error(),
+			Message: postErr.Error(),
+			Report:  terminal.Report,
+			State:   terminal.State,
 		})
 		return
 	}
-	// spawnPlaklet forwarded plaklet's own terminal (success) reply.
-	log.Printf("work %s (%s) succeeded in %s", item.WorkId, item.Op, time.Since(start))
+
+	// The work already failed on its own; the post-hook failure is reported
+	// alongside, not as a second terminal.
+	if postErr != nil {
+		log.Printf("work %s: %v", item.WorkId, postErr)
+		forwardReply(ctx, clt, item.WorkId, ExecReply{Type: ReplyError, Message: postErr.Error()})
+	}
+
+	forwardReply(ctx, clt, item.WorkId, *terminal)
+	if terminal.Type == ReplySuccess {
+		log.Printf("work %s (%s) succeeded in %s", item.WorkId, item.Op, time.Since(start))
+	} else {
+		log.Printf("work %s (%s) failed after %s: %s", item.WorkId, item.Op, time.Since(start), terminal.Message)
+	}
 }
 
 // ensurePackages fetches, through the control-plane proxy, any connector package
@@ -80,7 +131,13 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 	return nil
 }
 
-func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {
+// spawnPlaklet runs plaklet on the work item, forwarding its non-terminal
+// replies to the control plane as they stream. The terminal reply
+// (success/failure) is NOT forwarded: it is returned to the caller, who sends
+// it after the post-job hook has had its say. A nil reply with a non-nil error
+// means plaklet died without a result and the caller must synthesize the
+// terminal failure.
+func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) (*ExecReply, error) {
 	plakletArgs := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
 
 	// Honor the task's execution limits (set on the scheduler task as
@@ -102,7 +159,7 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 	if name == "" {
 		self, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("cannot locate own executable to run plaklet: %w", err)
+			return nil, fmt.Errorf("cannot locate own executable to run plaklet: %w", err)
 		}
 		name = self
 		args = append([]string{"plaklet"}, plakletArgs...)
@@ -115,18 +172,18 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		stdin.Close()
-		return err
+		return nil, err
 	}
 
 	if err := cmd.Start(); err != nil {
 		stdin.Close()
 		stdout.Close()
-		return fmt.Errorf("failed to start plaklet: %w", err)
+		return nil, fmt.Errorf("failed to start plaklet: %w", err)
 	}
 
 	payload := ExecPayload{
@@ -138,13 +195,13 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 	if err := json.NewEncoder(stdin).Encode(&payload); err != nil {
 		stdin.Close()
 		_ = cmd.Wait()
-		return fmt.Errorf("failed to send payload to plaklet: %w", err)
+		return nil, fmt.Errorf("failed to send payload to plaklet: %w", err)
 	}
 	stdin.Close()
 
-	// Pump plaklet's reply stream to the control plane. A terminal reply
-	// (success/failure) ends the loop; sawTerminal tracks whether we saw one.
-	sawTerminal := false
+	// Pump plaklet's reply stream to the control plane, holding the terminal
+	// reply (success/failure) back for the caller.
+	var terminal *ExecReply
 	dec := json.NewDecoder(stdout)
 	for {
 		var r ExecReply
@@ -155,24 +212,25 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 			log.Printf("work %s: decode plaklet reply: %v", item.WorkId, err)
 			break
 		}
-		if r.Type == ReplySuccess || r.Type == ReplyFailure {
-			sawTerminal = true
+		if (r.Type == ReplySuccess || r.Type == ReplyFailure) && terminal == nil {
+			terminal = &r
+			continue
 		}
 		forwardReply(ctx, clt, item.WorkId, r)
 	}
 
 	waitErr := cmd.Wait()
 
-	// If plaklet died without a terminal reply, synthesize a failure so the
+	// If plaklet died without a terminal reply, report a failure so the
 	// control plane doesn't hang waiting on the work.
-	if !sawTerminal {
+	if terminal == nil {
 		msg := "plaklet exited without a result"
 		if waitErr != nil {
 			msg = fmt.Sprintf("plaklet exited abnormally: %v", waitErr)
 		}
-		return errors.New(msg)
+		return nil, errors.New(msg)
 	}
-	return nil
+	return terminal, nil
 }
 
 // forwardReply relays a single plaklet ExecReply to the control plane as an edge

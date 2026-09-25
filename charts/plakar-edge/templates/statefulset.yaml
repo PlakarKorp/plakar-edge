@@ -48,6 +48,10 @@ spec:
             - -tags
             - {{ .Values.tags | quote }}
             {{- end }}
+            {{- if .Values.scripts.configMapName }}
+            - -scripts-dir
+            - {{ .Values.scripts.mountPath }}
+            {{- end }}
           env:
             - name: PLAKAR_EDGE_ENROLL_KEY
               valueFrom:
@@ -57,8 +61,21 @@ spec:
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
+            {{- if .Values.scripts.configMapName }}
+            - name: scripts
+              mountPath: {{ .Values.scripts.mountPath }}
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.scripts.configMapName }}
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ .Values.scripts.configMapName }}
+            # Scripts must be executable; ConfigMap mounts default to 0644.
+            defaultMode: 0555
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -120,12 +120,15 @@ func TestSpawnPlakletSuccess(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	err := spawnPlaklet(context.Background(), clt, cfg, item)
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplySuccess {
-		t.Fatalf("replies = %+v, want one ReplySuccess", replies)
+	if terminal == nil || terminal.Type != ReplySuccess {
+		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
+	}
+	if len(replies) != 0 {
+		t.Fatalf("replies = %+v, want none (the terminal is held for the caller)", replies)
 	}
 }
 
@@ -141,13 +144,17 @@ func TestSpawnPlakletFailureReplyIsForwardedNotErrored(t *testing.T) {
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
 	// plaklet itself reporting ReplyFailure is a terminal reply, so
-	// spawnPlaklet should return nil (it forwarded the failure already).
-	err := spawnPlaklet(context.Background(), clt, cfg, item)
+	// spawnPlaklet should hand it back rather than error: the caller owns
+	// sending the terminal.
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplyFailure || replies[0].Message != "boom" {
-		t.Fatalf("replies = %+v, want one ReplyFailure(boom)", replies)
+	if terminal == nil || terminal.Type != ReplyFailure || terminal.Message != "boom" {
+		t.Fatalf("terminal = %+v, want ReplyFailure(boom)", terminal)
+	}
+	if len(replies) != 0 {
+		t.Fatalf("replies = %+v, want none (the terminal is held for the caller)", replies)
 	}
 }
 
@@ -162,14 +169,15 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	if err := spawnPlaklet(context.Background(), clt, cfg, item); err != nil {
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if len(replies) != 2 {
-		t.Fatalf("replies = %+v, want 2", replies)
+	if len(replies) != 1 || replies[0].Type != ReplyInfo {
+		t.Fatalf("replies = %+v, want [info] (the terminal is held for the caller)", replies)
 	}
-	if replies[0].Type != ReplyInfo || replies[1].Type != ReplySuccess {
-		t.Fatalf("replies = %+v, want [info, success]", replies)
+	if terminal == nil || terminal.Type != ReplySuccess {
+		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
 	}
 }
 
@@ -184,7 +192,7 @@ func TestSpawnPlakletSilentExitSynthesizesFailure(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
 	if err == nil {
 		t.Fatal("expected error when plaklet exits without a terminal reply")
 	}
@@ -201,7 +209,7 @@ func TestSpawnPlakletCrashSynthesizesFailure(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
 	if err == nil {
 		t.Fatal("expected error when plaklet crashes without a terminal reply")
 	}
@@ -220,7 +228,7 @@ func TestSpawnPlakletMissingBinary(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
 	if err == nil {
 		t.Fatal("expected error for missing plaklet binary")
 	}

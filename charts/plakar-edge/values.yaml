@@ -33,6 +33,16 @@ pollHold: ""
 # Leave empty to report no tags.
 tags: ""
 
+# -- Pre/post-job hook scripts. When configMapName is set, that ConfigMap is
+# mounted read-only and executable at mountPath and passed as -scripts-dir, so
+# tasks may name its entries as hook scripts. Left empty, the edge refuses
+# every hook script (the binary's default).
+scripts:
+  # -- Name of an existing ConfigMap whose entries are the hook scripts.
+  configMapName: ""
+  # -- Where the scripts are mounted inside the container.
+  mountPath: /scripts
+
 # -- Enrollment key is never set here. The chart expects a Secret to already
 # exist (see charts/plakar-edge/README.md) and only references it, so the key
 # never ends up in `helm history`/rendered manifests/values.

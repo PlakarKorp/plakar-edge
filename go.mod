@@ -3,7 +3,7 @@ module github.com/PlakarKorp/plakar-edge
 go 1.25.5
 
 require (
-	github.com/PlakarKorp/plaklet v1.1.2
+	github.com/PlakarKorp/plaklet v1.1.3
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -22,7 +22,7 @@ require (
 	github.com/PlakarKorp/integrations/ptar v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/stdio v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/tar v1.1.0 // indirect
-	github.com/PlakarKorp/kloset v1.2.0-alpha.4 // indirect
+	github.com/PlakarKorp/kloset v1.1.8 // indirect
 	github.com/PlakarKorp/pkg v1.1.2 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect

@@ -79,6 +79,11 @@ const (
 	ReplyState   ReplyType = "state"
 	ReplyFailure ReplyType = "failure"
 	ReplySuccess ReplyType = "success"
+
+	// ReplyLog carries plaklet's stderr, which becomes the job's output log.
+	// It is edge-only: plaklet never emits it. Additive to the wire protocol:
+	// an older plakman drops the unknown type.
+	ReplyLog ReplyType = "log"
 )
 
 type Reply struct {

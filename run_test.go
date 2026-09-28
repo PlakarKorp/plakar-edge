@@ -32,6 +32,7 @@ func TestMain(m *testing.M) {
 //   - "success": consumes stdin, emits one ReplySuccess.
 //   - "failure": consumes stdin, emits one ReplyFailure.
 //   - "multi": emits ReplyInfo then ReplySuccess.
+//   - "stderr": writes two lines to stderr, emits ReplySuccess.
 //   - "silent": exits 0 without emitting anything (no terminal reply).
 //   - "crash": exits nonzero without emitting anything.
 func fakePlakletMain() {
@@ -47,6 +48,10 @@ func fakePlakletMain() {
 	case "multi":
 		_ = enc.Encode(ExecReply{Type: ReplyInfo, Message: "working"})
 		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: "done"})
+	case "stderr":
+		fmt.Fprintln(os.Stderr, "scanning /etc")
+		fmt.Fprintln(os.Stderr, "done")
+		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: "ok"})
 	case "silent":
 		// no output, clean exit
 	case "crash":
@@ -178,6 +183,37 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	}
 	if terminal == nil || terminal.Type != ReplySuccess {
 		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
+	}
+}
+
+func TestSpawnPlakletForwardsStderrAsLog(t *testing.T) {
+	bin := writePlakletWrapper(t, "stderr")
+	cfg := testConfig(t, bin)
+
+	var replies []Reply
+	srv := newReplyCapturingServer(&replies)
+	defer srv.Close()
+
+	clt := NewClient(srv.URL)
+	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
+
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	if err != nil {
+		t.Fatalf("spawnPlaklet: %v", err)
+	}
+	if terminal == nil || terminal.Type != ReplySuccess {
+		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
+	}
+
+	var got string
+	for _, r := range replies {
+		if r.Type != ReplyLog {
+			t.Fatalf("unexpected reply %+v", r)
+		}
+		got += r.Message
+	}
+	if got != "scanning /etc\ndone\n" {
+		t.Fatalf("log = %q, want plaklet's stderr", got)
 	}
 }
 

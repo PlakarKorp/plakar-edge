@@ -168,7 +168,9 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Stderr = os.Stderr
+	stderr := newLogStreamer(ctx, clt, item.WorkId, time.Second)
+	defer stderr.Close()
+	cmd.Stderr = stderr
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

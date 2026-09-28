@@ -110,8 +110,9 @@ and with no `-scripts-dir` every hook is refused.
 A pre-job script failure fails the work without running the job (or the
 post-job script). A post-job script failure fails an otherwise successful job —
 a database left frozen is not a success. Scripts receive `PLAKAR_WORK_ID`,
-`PLAKAR_OP` and `PLAKAR_HOOK` (`pre_job`/`post_job`) in their environment, and
-on failure the tail of their output is reported back to the control plane.
+`PLAKAR_OP` and `PLAKAR_HOOK` (`pre_job`/`post_job`) in their environment.
+Their output lands in the job's output log, next to plaklet's; on failure its
+tail is also carried in the failure message.
 
 ## Supervision & metrics
 

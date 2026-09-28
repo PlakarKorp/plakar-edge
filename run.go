@@ -25,7 +25,14 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	start := time.Now()
 	log.Printf("work %s (%s) started", item.WorkId, item.Op)
 
+	// One output log for the whole work: both hooks and plaklet write to it.
+	// It is closed before the terminal reply, since the control plane drops
+	// replies for a finished work item.
+	logs := newLogStreamer(ctx, clt, item.WorkId, time.Second)
+	defer logs.Close()
+
 	fail := func(err error) {
+		logs.Close()
 		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
 		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
 	}
@@ -40,7 +47,7 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// The pre-job hook exists so the job does not run without it (quiesce a
 	// database, mount a snapshot): a failure aborts the work before plaklet
 	// starts, and the post-job hook is not run -- there is nothing to undo.
-	if err := runHook(ctx, cfg, item, "pre_job"); err != nil {
+	if err := runHook(ctx, cfg, item, "pre_job", logs); err != nil {
 		fail(fmt.Errorf("pre-job hook: %w", err))
 		return
 	}
@@ -48,14 +55,15 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// spawnPlaklet holds plaklet's terminal reply back instead of forwarding
 	// it, so the post-job hook runs -- and can still fail the work -- before
 	// the control plane is told the work is over.
-	terminal, plakletErr := spawnPlaklet(ctx, clt, cfg, item)
+	terminal, plakletErr := spawnPlaklet(ctx, clt, cfg, item, logs)
 
 	// The post-job hook is the pre-job hook's undo: once the pre-job hook ran,
 	// it runs whether plaklet succeeded, failed or died.
 	var postErr error
-	if err := runHook(ctx, cfg, item, "post_job"); err != nil {
+	if err := runHook(ctx, cfg, item, "post_job", logs); err != nil {
 		postErr = fmt.Errorf("post-job hook: %w", err)
 	}
+	logs.Close()
 
 	if plakletErr != nil {
 		if postErr != nil {
@@ -136,8 +144,8 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 // (success/failure) is NOT forwarded: it is returned to the caller, who sends
 // it after the post-job hook has had its say. A nil reply with a non-nil error
 // means plaklet died without a result and the caller must synthesize the
-// terminal failure.
-func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) (*ExecReply, error) {
+// terminal failure. Plaklet's stderr goes to logs.
+func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem, logs io.Writer) (*ExecReply, error) {
 	plakletArgs := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
 
 	// Honor the task's execution limits (set on the scheduler task as
@@ -168,9 +176,7 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem)
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
-	stderr := newLogStreamer(ctx, clt, item.WorkId, time.Second)
-	defer stderr.Close()
-	cmd.Stderr = stderr
+	cmd.Stderr = logs
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

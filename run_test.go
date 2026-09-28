@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -125,7 +126,7 @@ func TestSpawnPlakletSuccess(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
@@ -151,7 +152,7 @@ func TestSpawnPlakletFailureReplyIsForwardedNotErrored(t *testing.T) {
 	// plaklet itself reporting ReplyFailure is a terminal reply, so
 	// spawnPlaklet should hand it back rather than error: the caller owns
 	// sending the terminal.
-	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
@@ -186,7 +187,7 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	}
 }
 
-func TestSpawnPlakletForwardsStderrAsLog(t *testing.T) {
+func TestRunWorkForwardsPlakletStderrAsLog(t *testing.T) {
 	bin := writePlakletWrapper(t, "stderr")
 	cfg := testConfig(t, bin)
 
@@ -194,26 +195,13 @@ func TestSpawnPlakletForwardsStderrAsLog(t *testing.T) {
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
-	clt := NewClient(srv.URL)
-	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
+	runWork(context.Background(), NewClient(srv.URL), cfg, &WorkItem{WorkId: uuid.New(), Op: "backup"})
 
-	terminal, err := spawnPlaklet(context.Background(), clt, cfg, item)
-	if err != nil {
-		t.Fatalf("spawnPlaklet: %v", err)
-	}
-	if terminal == nil || terminal.Type != ReplySuccess {
-		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
-	}
-
-	var got string
-	for _, r := range replies {
-		if r.Type != ReplyLog {
-			t.Fatalf("unexpected reply %+v", r)
-		}
-		got += r.Message
-	}
-	if got != "scanning /etc\ndone\n" {
+	if got := logText(replies); got != "scanning /etc\ndone\n" {
 		t.Fatalf("log = %q, want plaklet's stderr", got)
+	}
+	if last := replies[len(replies)-1]; last.Type != ReplySuccess {
+		t.Fatalf("last reply = %+v, want the terminal after the log", last)
 	}
 }
 
@@ -228,7 +216,7 @@ func TestSpawnPlakletSilentExitSynthesizesFailure(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err == nil {
 		t.Fatal("expected error when plaklet exits without a terminal reply")
 	}
@@ -245,7 +233,7 @@ func TestSpawnPlakletCrashSynthesizesFailure(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err == nil {
 		t.Fatal("expected error when plaklet crashes without a terminal reply")
 	}
@@ -264,7 +252,7 @@ func TestSpawnPlakletMissingBinary(t *testing.T) {
 	clt := NewClient(srv.URL)
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 
-	_, err := spawnPlaklet(context.Background(), clt, cfg, item)
+	_, err := spawnPlaklet(context.Background(), clt, cfg, item, io.Discard)
 	if err == nil {
 		t.Fatal("expected error for missing plaklet binary")
 	}
@@ -382,4 +370,26 @@ func newReplyCapturingServer(replies *[]Reply) *httptest.Server {
 		w.WriteHeader(http.StatusOK)
 	})
 	return httptest.NewServer(mux)
+}
+
+// logText concatenates the log replies.
+func logText(replies []Reply) string {
+	var s string
+	for _, r := range replies {
+		if r.Type == ReplyLog {
+			s += r.Message
+		}
+	}
+	return s
+}
+
+// withoutLogs drops the log replies, leaving the ones that carry protocol.
+func withoutLogs(replies []Reply) []Reply {
+	var out []Reply
+	for _, r := range replies {
+		if r.Type != ReplyLog {
+			out = append(out, r)
+		}
+	}
+	return out
 }

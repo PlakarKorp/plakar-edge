@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -52,9 +53,9 @@ func resolveHookScript(scriptsDir, name string) (string, error) {
 // runHook runs the hook script the work item names under "hooks.<hook>", if
 // any. The script inherits the daemon's environment plus PLAKAR_WORK_ID,
 // PLAKAR_OP and PLAKAR_HOOK so one script can serve several tasks and both
-// ends of one. Its combined output is captured, not streamed: on failure the
-// tail rides in the error, which is what the control plane shows.
-func runHook(ctx context.Context, cfg *Config, item *WorkItem, hook string) error {
+// ends of one. Its combined output goes to logs, the job's output log; on
+// failure its tail also rides in the error, which the job's status shows.
+func runHook(ctx context.Context, cfg *Config, item *WorkItem, hook string, logs io.Writer) error {
 	name := hookScript(item, hook)
 	if name == "" {
 		return nil
@@ -72,11 +73,38 @@ func runHook(ctx context.Context, cfg *Config, item *WorkItem, hook string) erro
 		"PLAKAR_OP="+item.Op,
 		"PLAKAR_HOOK="+hook,
 	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("script %q: %w%s", name, err, outputTail(out))
+	fmt.Fprintf(logs, "running %s hook %q\n", hook, name)
+	tail := &tailBuffer{max: 4096}
+	// One writer for both streams: exec then copies them from a single pipe,
+	// so tailBuffer sees no concurrent writes.
+	out := io.MultiWriter(logs, tail)
+	cmd.Stdout = out
+	cmd.Stderr = out
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("script %q: %w%s", name, err, outputTail(tail.bytes()))
 	}
 	return nil
+}
+
+// tailBuffer keeps the last max bytes written to it.
+type tailBuffer struct {
+	max int
+	buf []byte
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > 2*t.max {
+		t.buf = append([]byte(nil), t.buf[len(t.buf)-t.max:]...)
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) bytes() []byte {
+	if len(t.buf) > t.max {
+		return t.buf[len(t.buf)-t.max:]
+	}
+	return t.buf
 }
 
 // outputTail renders the end of a failed script's output for an error message,

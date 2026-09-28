@@ -110,6 +110,7 @@ func TestRunWorkRunsHooksAroundPlaklet(t *testing.T) {
 		"hooks.post_job": "post.sh",
 	}}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	if got := readMarker(t, marker); len(got) != 2 || got[0] != "pre_job" || got[1] != "post_job" {
 		t.Fatalf("hooks ran = %v, want [pre_job post_job]", got)
@@ -133,6 +134,7 @@ func TestRunWorkPreHookFailureAbortsTheWork(t *testing.T) {
 		"hooks.post_job": "post.sh",
 	}}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	// The pre-job hook failed: plaklet never ran, the post-job hook (its
 	// undo) never ran, and the one terminal reply is a failure naming the
@@ -163,6 +165,7 @@ func TestRunWorkMissingScriptsDirFailsAHookedWork(t *testing.T) {
 		"hooks.pre_job": "pre.sh",
 	}}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	if got := readMarker(t, marker); got != nil {
 		t.Fatalf("hooks ran = %v, want none", got)
@@ -184,6 +187,7 @@ func TestRunWorkPostHookFailureFailsASuccessfulWork(t *testing.T) {
 		"hooks.post_job": "post.sh",
 	}}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	// Plaklet succeeded but its cleanup did not: exactly one terminal reply,
 	// and it is a failure naming the post-job hook.
@@ -209,6 +213,7 @@ func TestRunWorkPostHookRunsAndReportsAfterPlakletFailure(t *testing.T) {
 		"hooks.post_job": "post.sh",
 	}}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	// The post-job hook still ran (cleanup happens on failure too), its own
 	// failure rides as a non-terminal error, and plaklet's failure stays the
@@ -233,11 +238,53 @@ func TestRunWorkWithoutHooksRunsNoScript(t *testing.T) {
 
 	item := &WorkItem{WorkId: uuid.New(), Op: "backup"}
 	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+	replies = withoutLogs(replies)
 
 	if got := readMarker(t, marker); got != nil {
 		t.Fatalf("hooks ran = %v, want none", got)
 	}
 	if len(replies) != 1 || replies[0].Type != ReplySuccess {
 		t.Fatalf("replies = %+v, want one ReplySuccess", replies)
+	}
+}
+
+func TestRunWorkStreamsHookOutputToTheLog(t *testing.T) {
+	cfg, scripts, marker := hooksTestSetup(t, "stderr")
+	writeHookScript(t, scripts, "pre.sh", marker, "echo freezing\necho warn >&2")
+	writeHookScript(t, scripts, "post.sh", marker, "echo thawing")
+
+	var replies []Reply
+	srv := newReplyCapturingServer(&replies)
+	defer srv.Close()
+
+	item := &WorkItem{WorkId: uuid.New(), Op: "backup", TaskConfig: map[string]string{
+		"hooks.pre_job":  "pre.sh",
+		"hooks.post_job": "post.sh",
+	}}
+	runWork(context.Background(), NewClient(srv.URL), cfg, item)
+
+	want := "running pre_job hook \"pre.sh\"\n" +
+		"freezing\nwarn\n" +
+		"scanning /etc\ndone\n" +
+		"running post_job hook \"post.sh\"\n" +
+		"thawing\n"
+	if got := logText(replies); got != want {
+		t.Fatalf("log = %q, want %q", got, want)
+	}
+	if last := replies[len(replies)-1]; last.Type != ReplySuccess {
+		t.Fatalf("last reply = %+v, want the terminal after the log", last)
+	}
+}
+
+func TestTailBufferKeepsTheEnd(t *testing.T) {
+	tail := &tailBuffer{max: 8}
+	for i := range 100 {
+		_, _ = tail.Write([]byte{byte('a' + i%26)})
+	}
+	if got := string(tail.bytes()); got != "opqrstuv" {
+		t.Fatalf("tail = %q, want the last 8 bytes", got)
+	}
+	if cap(tail.buf) > 4*tail.max {
+		t.Fatalf("buffer grew to %d bytes", cap(tail.buf))
 	}
 }

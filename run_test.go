@@ -36,6 +36,7 @@ func TestMain(m *testing.M) {
 //   - "stderr": writes two lines to stderr, emits ReplySuccess.
 //   - "silent": exits 0 without emitting anything (no terminal reply).
 //   - "crash": exits nonzero without emitting anything.
+//   - "authsock": emits ReplySuccess carrying its SSH_AUTH_SOCK.
 func fakePlakletMain() {
 	var payload ExecPayload
 	_ = json.NewDecoder(os.Stdin).Decode(&payload)
@@ -57,6 +58,8 @@ func fakePlakletMain() {
 		// no output, clean exit
 	case "crash":
 		os.Exit(1)
+	case "authsock":
+		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: os.Getenv("SSH_AUTH_SOCK")})
 	default:
 		fmt.Fprintln(os.Stderr, "unknown script")
 		os.Exit(2)

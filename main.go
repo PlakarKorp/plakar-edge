@@ -68,6 +68,10 @@ type Config struct {
 	// rather than running without it. Scripts are named by bare file name and
 	// are never resolved outside this directory.
 	ScriptsDir string
+	// SSHAuthSock is the socket of the edge's own ssh-agent, passed to
+	// plaklet as SSH_AUTH_SOCK so integrations can load keys into it. Empty
+	// when no agent could be started; plaklet then inherits the edge's env.
+	SSHAuthSock string
 }
 
 // plakletPkgDir and plakletCacheDir derive the paths plaklet expects from the
@@ -257,6 +261,14 @@ func main() {
 	}
 
 	clt.SetToken(st.Token)
+
+	// Not fatal: only tasks that hand the integration a private key need
+	// it, and the edge should keep serving every other task.
+	if sock, err := startSSHAgent(rootCtx); err != nil {
+		log.Printf("warning: no ssh-agent, tasks using an ssh private key will fail: %v", err)
+	} else {
+		cfg.SSHAuthSock = sock
+	}
 
 	// Enrolled and about to poll: the edge is ready to be dispatched work.
 	hlth.setReady(true)

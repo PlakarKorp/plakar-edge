@@ -114,6 +114,14 @@ a database left frozen is not a success. Scripts receive `PLAKAR_WORK_ID`,
 Their output lands in the job's output log, next to plaklet's; on failure its
 tail is also carried in the failure message.
 
+### SSH keys
+
+Tasks that authenticate over SSH with a private key hand it to `ssh-add`, which
+needs an agent. The edge runs its own `ssh-agent` for its lifetime and passes
+its socket to plaklet as `SSH_AUTH_SOCK`, so `ssh`, `ssh-add` and `ssh-agent`
+(OpenSSH client) must be installed on the edge host. Without `ssh-agent` the
+edge still starts, logs a warning, and only those tasks fail.
+
 ## Supervision & metrics
 
 The edge runs a small HTTP server on `-listen` for supervision and monitoring.

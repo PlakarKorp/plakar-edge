@@ -81,6 +81,36 @@ func TestSaveStateFilePermissions(t *testing.T) {
 	}
 }
 
+func TestCheckStateWritableCreatesDirectoryAndCleansUp(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "nested", "state")
+	c := &Config{StateDir: dir}
+
+	if err := checkStateWritable(c); err != nil {
+		t.Fatalf("checkStateWritable: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read state dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("state dir contains probe files after check: %v", entries)
+	}
+}
+
+func TestCheckStateWritableRejectsUnusablePath(t *testing.T) {
+	parent := t.TempDir()
+	path := filepath.Join(parent, "not-a-directory")
+	if err := os.WriteFile(path, []byte("occupied"), 0o600); err != nil {
+		t.Fatalf("create regular file: %v", err)
+	}
+
+	err := checkStateWritable(&Config{StateDir: filepath.Join(path, "state")})
+	if err == nil {
+		t.Fatal("checkStateWritable succeeded with a regular file as parent")
+	}
+}
+
 func TestLoadStateMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	c := &Config{StateDir: dir}

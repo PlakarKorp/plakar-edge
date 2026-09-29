@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -104,6 +105,36 @@ func saveState(c *Config, s *state) error {
 	}
 	// 0600: the token is a credential.
 	return os.WriteFile(c.statePath(), buf, 0o600)
+}
+
+// checkStateWritable verifies that a newly enrolled identity can be persisted
+// before registering it with the control plane. Checking mode bits is not
+// enough here: ACLs, read-only filesystems and the effective service user can
+// all make a directory unwritable despite its apparent permissions.
+func checkStateWritable(c *Config) error {
+	if err := os.MkdirAll(c.StateDir, 0o700); err != nil {
+		return fmt.Errorf("create state directory: %w", err)
+	}
+
+	probe, err := os.CreateTemp(c.StateDir, ".edge-state-check-*")
+	if err != nil {
+		return fmt.Errorf("create file in state directory: %w", err)
+	}
+	probePath := probe.Name()
+	defer os.Remove(probePath)
+
+	if _, err := probe.WriteString("{}"); err != nil {
+		_ = probe.Close()
+		return fmt.Errorf("write file in state directory: %w", err)
+	}
+	if err := probe.Sync(); err != nil {
+		_ = probe.Close()
+		return fmt.Errorf("sync file in state directory: %w", err)
+	}
+	if err := probe.Close(); err != nil {
+		return fmt.Errorf("close file in state directory: %w", err)
+	}
+	return nil
 }
 
 func main() {
@@ -210,6 +241,12 @@ func main() {
 		orgID, err := uuid.Parse(organizationID)
 		if err != nil {
 			fatal("-organization is not a valid id: %v", err)
+		}
+		// Enrollment creates the edge remotely. Prove first that its returned
+		// identity can be saved locally, otherwise a restart would enroll again
+		// and hit a name conflict for the edge it just created.
+		if err := checkStateWritable(&cfg); err != nil {
+			fatal("state directory %q is not writable: %v", cfg.StateDir, err)
 		}
 		st = enroll(rootCtx, clt, &cfg, orgID, enrollmentKey, name, hostname)
 		if st == nil {

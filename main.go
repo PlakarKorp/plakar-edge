@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -48,10 +49,8 @@ type Config struct {
 	// <PkgDir>/cache, matching how the control-plane executor drives plaklet.
 	PkgDir   string
 	PollHold time.Duration
-	// MaxParallel bounds how many tasks this edge runs concurrently. The poll
-	// loop acquires a slot before polling, so a saturated edge stops asking
-	// for work instead of accepting items it cannot start yet. Values below 1
-	// are treated as 1.
+	// MaxParallel bounds how many tasks this edge runs concurrently.
+	// Values below 1 are treated as 1.
 	MaxParallel int
 	// Listen is the address (host:port) for the supervision HTTP server that
 	// serves /health, /ready and, when enabled, /metrics. Empty disables it.
@@ -339,16 +338,12 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, orgID uuid.UUID, key,
 	}
 }
 
-// pollLoop is the daemon's heart: long-poll, dispatch, repeat, until the
-// context is canceled. Work items run on their own goroutines, bounded by a
-// semaphore of cfg.MaxParallel slots. A slot is acquired *before* polling so a
-// saturated edge stops asking for work rather than accepting items it cannot
-// start — those stay queued for other edges. On shutdown the loop waits for
-// in-flight tasks: the canceled context kills their plaklet processes and each
-// runWork still sends a terminal reply. Transient poll errors back off briefly
-// rather than spinning. Every poll re-reports the edge's current facts so the
-// control plane's view tracks this build/host across restarts (they're
-// constant within a process, so we gather them once).
+// pollLoop long-polls the control plane and dispatches work until ctx is
+// canceled. Each poll reports the free slots (cfg.MaxParallel minus running
+// works); the server sends no new work when there are none, but can still
+// send a "cancel" for a running one. Each work runs on its own goroutine with
+// its own context, so it can be canceled individually. On shutdown the loop
+// waits for running works. Transient poll errors back off briefly.
 func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 	const backoff = 5 * time.Second
 	hostname, _ := os.Hostname()
@@ -360,24 +355,22 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 		Tags:            cfg.Tags,
 	}
 
-	sem := make(chan struct{}, max(cfg.MaxParallel, 1))
+	var slots atomic.Int64
+	var mu sync.Mutex
+	cancels := map[uuid.UUID]func(){}
 	var wg sync.WaitGroup
 	defer wg.Wait()
+
+	slots.Store(int64(max(cfg.MaxParallel, 1)))
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		select {
-		case sem <- struct{}{}:
-		case <-ctx.Done():
-			return
-		}
-
+		poll.Slots = int(slots.Load())
 		item, err := clt.Poll(ctx, cfg.PollHold, poll)
 		if err != nil {
-			<-sem
 			if ctx.Err() != nil {
 				return
 			}
@@ -398,16 +391,39 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			continue
 		}
 		if item == nil {
-			<-sem
 			continue // no work; poll again
 		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() { <-sem }()
-			runWork(ctx, clt, cfg, item)
-		}()
+		if item.Op == "cancel" {
+			mu.Lock()
+			cancel, found := cancels[item.WorkId]
+			delete(cancels, item.WorkId)
+			mu.Unlock()
+			if found {
+				log.Printf("canceling work %s", item.WorkId)
+				cancel()
+			} else {
+				log.Printf("cancel for unknown work %s", item.WorkId)
+			}
+			continue
+		}
+
+		slots.Add(-1)
+		newCtx, cancel := context.WithCancel(ctx)
+		mu.Lock()
+		cancels[item.WorkId] = cancel
+		mu.Unlock()
+		wg.Go(func() {
+			runWork(newCtx, clt, cfg, item)
+			mu.Lock()
+			cancel, found := cancels[item.WorkId]
+			delete(cancels, item.WorkId)
+			mu.Unlock()
+			if found {
+				cancel()
+			}
+			slots.Add(1)
+		})
 	}
 }
 

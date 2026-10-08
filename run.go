@@ -143,7 +143,7 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 		}
 
 		log.Printf("fetching connector package %s (%s/%s) via control plane", key, runtime.GOOS, runtime.GOARCH)
-		if err := clt.FetchPackage(ctx, p.Name, p.Version, p.OperatingSystem, p.Architecture, dst); err != nil {
+		if err := clt.FetchPackage(ctx, &p, dst); err != nil {
 			return fmt.Errorf("failed to fetch package %s: %w", key, err)
 		}
 		log.Printf("installed %s", filename)

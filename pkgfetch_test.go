@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/PlakarKorp/pkg"
 )
 
 // FetchPackage streams the proxied package bytes to disk atomically and sends
@@ -25,7 +27,7 @@ func TestFetchPackageWritesFile(t *testing.T) {
 	c.SetToken("tok")
 
 	dst := filepath.Join(t.TempDir(), "s3_v1.1.4_linux_arm64.ptar")
-	if err := c.FetchPackage(context.Background(), "s3", "v1.1.4", "linux", "arm64", dst); err != nil {
+	if err := c.FetchPackage(context.Background(), &pkg.Package{Name: "s3", Version: "v1.1.4", OperatingSystem: "linux", Architecture: "arm64"}, dst); err != nil {
 		t.Fatalf("FetchPackage: %v", err)
 	}
 
@@ -57,7 +59,7 @@ func TestFetchPackageErrorLeavesNoFile(t *testing.T) {
 	defer srv.Close()
 
 	dst := filepath.Join(t.TempDir(), "missing.ptar")
-	err := c(srv).FetchPackage(context.Background(), "nope", "v9", "linux", "arm64", dst)
+	err := c(srv).FetchPackage(context.Background(), &pkg.Package{Name: "nope", Version: "v9", OperatingSystem: "linux", Architecture: "arm64"}, dst)
 	if err == nil {
 		t.Fatal("want error on 404")
 	}

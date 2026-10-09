@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/PlakarKorp/pkg"
 	"github.com/google/uuid"
 )
 
@@ -117,21 +118,32 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 		if conf == nil || conf.Integration.Name == "" {
 			continue
 		}
-		name, version := conf.Integration.Name, conf.Integration.Version
-		key := name + "@" + version
+
+		p := pkg.Package{
+			Name:            conf.Integration.Name,
+			Version:         conf.Integration.Version,
+			Architecture:    runtime.GOARCH,
+			OperatingSystem: runtime.GOOS,
+		}
+
+		if err := p.Validate(); err != nil {
+			return fmt.Errorf("received invalid package: %w", err)
+		}
+
+		key := p.Name + "@" + p.Version
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
 
-		filename := fmt.Sprintf("%s_%s_%s_%s.ptar", name, version, runtime.GOOS, runtime.GOARCH)
+		filename := p.Filename()
 		dst := filepath.Join(intdir, filename)
 		if _, err := os.Stat(dst); err == nil {
 			continue // already present
 		}
 
 		log.Printf("fetching connector package %s (%s/%s) via control plane", key, runtime.GOOS, runtime.GOARCH)
-		if err := clt.FetchPackage(ctx, name, version, runtime.GOOS, runtime.GOARCH, dst); err != nil {
+		if err := clt.FetchPackage(ctx, &p, dst); err != nil {
 			return fmt.Errorf("failed to fetch package %s: %w", key, err)
 		}
 		log.Printf("installed %s", filename)

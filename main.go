@@ -338,6 +338,8 @@ func enroll(ctx context.Context, clt *Client, cfg *Config, orgID uuid.UUID, key,
 	}
 }
 
+var pollInterrupted = errors.New("poll interrupted")
+
 // pollLoop long-polls the control plane and dispatches work until ctx is
 // canceled. Each poll reports the free slots (cfg.MaxParallel minus running
 // works); the server sends no new work when there are none, but can still
@@ -363,13 +365,31 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 
 	slots.Store(int64(max(cfg.MaxParallel, 1)))
 
+	// interruptPoll cancels the poll in flight, if any. It is set, and the
+	// slots it reports read, under mu, so a work ending while a poll is being
+	// prepared cannot be missed.
+	var interruptPoll context.CancelCauseFunc
+
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
+		pollCtx, pollCancel := context.WithCancelCause(ctx)
+		mu.Lock()
 		poll.Slots = int(slots.Load())
-		item, err := clt.Poll(ctx, cfg.PollHold, poll)
+		interruptPoll = pollCancel
+		mu.Unlock()
+		item, err := clt.Poll(pollCtx, cfg.PollHold, poll)
+		mu.Lock()
+		interruptPoll = nil
+		mu.Unlock()
+		pollCancel(nil)
+		if err != nil && errors.Is(context.Cause(pollCtx), pollInterrupted) {
+			// A work ended and freed a slot: poll again with it.
+			continue
+		}
+
 		if err != nil {
 			if ctx.Err() != nil {
 				return
@@ -422,7 +442,13 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			if found {
 				cancel()
 			}
-			slots.Add(1)
+			// If the current number is 0, interrupt the current poll so that the next
+			// call has a non-zero slot.
+			mu.Lock()
+			if slots.Add(1) == 1 && interruptPoll != nil {
+				interruptPoll(pollInterrupted)
+			}
+			mu.Unlock()
 		})
 	}
 }

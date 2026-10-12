@@ -17,6 +17,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const postHookTimeout = time.Minute
+
 // runWork executes one work item by spawning the local plaklet, feeding it the
 // ExecPayload on stdin and forwarding every ExecReply it emits back to the
 // control plane, wrapped in the pre/post-job hook scripts the task may name.
@@ -58,10 +60,13 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// the control plane is told the work is over.
 	terminal, plakletErr := spawnPlaklet(ctx, clt, cfg, item, logs)
 
+	postCtx, postCancel := context.WithTimeout(context.WithoutCancel(ctx), postHookTimeout)
+	defer postCancel()
+
 	// The post-job hook is the pre-job hook's undo: once the pre-job hook ran,
 	// it runs whether plaklet succeeded, failed or died.
 	var postErr error
-	if err := runHook(ctx, cfg, item, "post_job", logs); err != nil {
+	if err := runHook(postCtx, cfg, item, "post_job", logs); err != nil {
 		postErr = fmt.Errorf("post-job hook: %w", err)
 	}
 	logs.Close()

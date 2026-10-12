@@ -27,3 +27,18 @@ func parseTags(raw string) []string {
 	}
 	return tags
 }
+
+// edgeTags merges the tags in flagTags and extraTags, dropping duplicates.
+func edgeTags(flagTags, extraTags string) []string {
+	all := parseTags(flagTags + "," + extraTags)
+	seen := make(map[string]bool, len(all))
+	tags := all[:0]
+	for _, t := range all {
+		if seen[t] {
+			continue
+		}
+		seen[t] = true
+		tags = append(tags, t)
+	}
+	return tags
+}

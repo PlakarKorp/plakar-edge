@@ -59,8 +59,9 @@ type Config struct {
 	// Metrics enables the node-exporter /metrics endpoint on the Listen address.
 	Metrics bool
 	// Tags are freeform "key=value" strings this edge self-reports on every
-	// poll, letting the control plane target it by tag match. Parsed from
-	// -tags once at startup; changing them requires a restart.
+	// poll, letting the control plane target it by tag match. Parsed from -tags
+	// and PLAKAR_EDGE_EXTRA_TAGS once at startup; changing them requires a
+	// restart.
 	Tags []string
 	// ScriptsDir is the directory pre/post-job hook scripts are run from
 	// (tasks name them in their config as hooks.pre_job / hooks.post_job).
@@ -163,11 +164,11 @@ func main() {
 	flag.IntVar(&cfg.MaxParallel, "max-parallel", 5, "maximum number of tasks to run concurrently")
 	flag.StringVar(&cfg.Listen, "listen", "127.0.0.1:9877", "address for the supervision HTTP server (/health, /ready, /metrics); empty disables it")
 	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
-	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod)")
+	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod); PLAKAR_EDGE_EXTRA_TAGS adds to them")
 	flag.StringVar(&cfg.ScriptsDir, "scripts-dir", "", "directory containing the pre/post-job hook scripts tasks may name; empty (default) refuses every hook script")
 	flag.Parse()
 
-	cfg.Tags = parseTags(rawTags)
+	cfg.Tags = edgeTags(rawTags, os.Getenv("PLAKAR_EDGE_EXTRA_TAGS"))
 
 	if cfg.APIURL == "" {
 		fatal("-control-plane is required")

@@ -94,7 +94,7 @@ likewise retries through control-plane outages.
 | `-poll-hold` | `30s` | Expected server-side long-poll hold |
 | `-listen` | `127.0.0.1:9877` | Address for the supervision HTTP server (`/health`, `/ready`, `/metrics`); empty disables it |
 | `-metrics` | `true` | Expose node-exporter metrics at `/metrics` on the `-listen` address |
-| `-tags` | | Comma-separated list of tags self-reported to the control plane on every poll (e.g. `env:prod,zone:eu-1`), letting it target this edge by tag match |
+| `-tags` | | Comma-separated list of tags self-reported to the control plane on every poll (e.g. `env:prod,zone:eu-1`), letting it target this edge by tag match. Tags in `PLAKAR_EDGE_EXTRA_TAGS` are added to these |
 | `-scripts-dir` | | Directory holding the pre/post-job hook scripts tasks may name. Empty (the default) refuses every hook script |
 
 ### Pre/post-job hook scripts

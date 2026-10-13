@@ -20,7 +20,7 @@ import (
 // match plakman's contract.EdgeProtocolVersion for the control plane to dispatch
 // work; it is bumped only when the WorkItem/Reply/Configuration or plaklet
 // ExecPayload/ExecReply shapes change. Keep in sync with plakman.
-const EdgeProtocolVersion = 1
+const EdgeProtocolVersion = 2
 
 type EnrollRequest struct {
 	// OrganizationID is the organization this edge joins. Named rather than
@@ -59,6 +59,7 @@ type PollRequest struct {
 	Hostname        string     `json:"hostname"`
 	SystemInfo      SystemInfo `json:"system_info"`
 	Tags            []string   `json:"tags,omitempty"`
+	Slots           int        `json:"slots,omitempty"`
 }
 
 type WorkItem struct {

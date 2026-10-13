@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -304,36 +305,165 @@ func TestPollLoopPollsWhileTaskRuns(t *testing.T) {
 	}
 }
 
-func TestPollLoopBoundsParallelism(t *testing.T) {
-	script := fakeSleepingPlaklet(t)
-	srv, pollCount := pollOnceThenCount(t)
+// fakeControlPlane behaves like a v2 server: it always delivers a queued
+// cancel, delivers queued work only to a poll advertising a free slot, and
+// records the slots of every poll and the type of every reply.
+type fakeControlPlane struct {
+	work    chan WorkItem
+	cancels chan WorkItem
 
-	c := NewClient(srv.URL)
+	mu      sync.Mutex
+	slots   []int
+	replies []ReplyType
+}
+
+func newFakeControlPlane(t *testing.T) (*fakeControlPlane, *httptest.Server) {
+	t.Helper()
+	cp := &fakeControlPlane{work: make(chan WorkItem, 4), cancels: make(chan WorkItem, 4)}
+	serve := func(w http.ResponseWriter, item WorkItem) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(item)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/edge/poll", func(w http.ResponseWriter, r *http.Request) {
+		var req PollRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		cp.mu.Lock()
+		cp.slots = append(cp.slots, req.Slots)
+		cp.mu.Unlock()
+		select {
+		case item := <-cp.cancels:
+			serve(w, item)
+			return
+		default:
+		}
+		if req.Slots > 0 {
+			select {
+			case item := <-cp.work:
+				serve(w, item)
+				return
+			default:
+			}
+		}
+		time.Sleep(5 * time.Millisecond) // stands in for the long-poll hold
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
+		var rep Reply
+		_ = json.NewDecoder(r.Body).Decode(&rep)
+		cp.mu.Lock()
+		cp.replies = append(cp.replies, rep.Type)
+		cp.mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return cp, srv
+}
+
+func (cp *fakeControlPlane) lastSlots() int {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	if len(cp.slots) == 0 {
+		return -1
+	}
+	return cp.slots[len(cp.slots)-1]
+}
+
+func (cp *fakeControlPlane) replied(typ ReplyType) bool {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	return slices.Contains(cp.replies, typ)
+}
+
+// startPollLoop runs pollLoop in the background; the returned func stops it
+// and fails the test if in-flight work is not reaped.
+func startPollLoop(t *testing.T, srv *httptest.Server, cfg *Config) (stop func()) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	done := make(chan struct{})
 	go func() {
-		// MaxParallel unset clamps to 1: the single slot is held by the
-		// sleeping task, so no further poll may happen.
-		pollLoop(ctx, c, &Config{
-			PollHold:   time.Millisecond,
-			PlakletBin: script,
-			PkgDir:     t.TempDir(),
-		})
+		pollLoop(ctx, NewClient(srv.URL), cfg)
 		close(done)
 	}()
-
-	time.Sleep(250 * time.Millisecond)
-	if got := pollCount.Load(); got != 1 {
-		t.Errorf("pollCount = %d, want 1 (a saturated edge must not poll for more work)", got)
+	return func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("pollLoop did not return after cancel; in-flight work was not reaped")
+		}
 	}
+}
 
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("pollLoop did not return after cancel; in-flight task was not reaped")
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestPollLoopReportsFreeSlots(t *testing.T) {
+	cp, srv := newFakeControlPlane(t)
+	cp.work <- WorkItem{WorkId: uuid.New(), Op: "noop"}
+
+	// MaxParallel unset clamps to 1.
+	stop := startPollLoop(t, srv, &Config{
+		PollHold:   time.Millisecond,
+		PlakletBin: fakeSleepingPlaklet(t),
+		PkgDir:     t.TempDir(),
+	})
+	defer stop()
+
+	waitFor(t, "a poll advertising 0 slots while the task runs", func() bool { return cp.lastSlots() == 0 })
+	cp.mu.Lock()
+	first := cp.slots[0]
+	cp.mu.Unlock()
+	if first != 1 {
+		t.Errorf("first poll slots = %d, want 1 (MaxParallel below 1 is treated as 1)", first)
+	}
+}
+
+func TestPollLoopCancelsRunningWork(t *testing.T) {
+	cp, srv := newFakeControlPlane(t)
+	id := uuid.New()
+	cp.work <- WorkItem{WorkId: id, Op: "noop"}
+
+	stop := startPollLoop(t, srv, &Config{
+		PollHold:   time.Millisecond,
+		PlakletBin: fakeSleepingPlaklet(t), // sleeps 30s unless killed
+		PkgDir:     t.TempDir(),
+	})
+	defer stop()
+
+	waitFor(t, "the work to take the slot", func() bool { return cp.lastSlots() == 0 })
+	cp.cancels <- WorkItem{WorkId: id, Op: "cancel"}
+	// The slot comes back only once runWork has returned, i.e. plaklet was killed.
+	waitFor(t, "the slot to be freed by the cancel", func() bool { return cp.lastSlots() == 1 })
+
+	if cp.replied(ReplyFailure) || cp.replied(ReplySuccess) {
+		t.Error("a canceled work must not send a terminal reply")
+	}
+}
+
+func TestPollLoopIgnoresCancelForUnknownWork(t *testing.T) {
+	cp, srv := newFakeControlPlane(t)
+	cp.cancels <- WorkItem{WorkId: uuid.New(), Op: "cancel"}
+
+	stop := startPollLoop(t, srv, &Config{PollHold: time.Millisecond, MaxParallel: 2})
+	defer stop()
+
+	waitFor(t, "polling to continue after the cancel", func() bool {
+		cp.mu.Lock()
+		defer cp.mu.Unlock()
+		return len(cp.slots) >= 3
+	})
+	if got := cp.lastSlots(); got != 2 {
+		t.Errorf("slots = %d, want 2 (an unknown cancel must not take a slot)", got)
 	}
 }
 
@@ -376,4 +506,54 @@ func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 	if gotReply.Type != ReplyFailure {
 		t.Errorf("gotReply.Type = %q, want %q", gotReply.Type, ReplyFailure)
 	}
+}
+
+// A work ending while a 0-slot poll is held must interrupt that poll, so the
+// freed slot is advertised at once instead of after the server-side hold.
+func TestPollLoopInterruptsZeroSlotPollWhenWorkEnds(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake plaklet is a shell script")
+	}
+	// The fake plaklet exits once the 0-slot poll is held, so the work always
+	// ends while that poll is in flight.
+	held := filepath.Join(t.TempDir(), "held")
+	script := filepath.Join(t.TempDir(), "fake-plaklet")
+	body := "#!/bin/sh\nwhile [ ! -e " + shellQuote(held) + " ]; do sleep 0.01; done\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatalf("write fake plaklet: %v", err)
+	}
+
+	var works atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/edge/poll", func(w http.ResponseWriter, r *http.Request) {
+		var req PollRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Slots == 0 {
+			_ = os.WriteFile(held, nil, 0o644)
+			select {
+			case <-r.Context().Done():
+			case <-time.After(30 * time.Second): // the server-side hold
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		works.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(WorkItem{WorkId: uuid.New(), Op: "noop"})
+	})
+	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	stop := startPollLoop(t, srv, &Config{
+		PollHold:    30 * time.Second,
+		PlakletBin:  script,
+		PkgDir:      t.TempDir(),
+		MaxParallel: 1,
+	})
+	defer stop()
+
+	waitFor(t, "a second work once the first one freed the slot", func() bool { return works.Load() >= 2 })
 }

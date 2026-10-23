@@ -118,7 +118,11 @@ func (c *Client) FetchPackage(ctx context.Context, p *pkg.Package, dst string) e
 		os.Remove(f.Name())
 		return err
 	}
-	return os.Rename(tmp, dst)
+	if err := os.Rename(f.Name(), dst); err != nil {
+		os.Remove(f.Name())
+		return err
+	}
+	return nil
 }
 
 func (c *Client) doStatus(ctx context.Context, method, path string, body, out any) (int, error) {

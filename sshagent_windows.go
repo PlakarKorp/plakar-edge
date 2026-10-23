@@ -1,4 +1,5 @@
 //go:build windows
+
 package main
 
 import (
@@ -21,7 +22,7 @@ func startSSHAgent(ctx context.Context) (string, error) {
 	args = append(args, "Get-Service ssh-agent | " +
 	    "Select Status | Format-List")
 
-	cmd := exec.Command("PowerShell", args...)
+	cmd := exec.CommandContext(ctx, "PowerShell", args...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

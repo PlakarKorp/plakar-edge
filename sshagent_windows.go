@@ -19,12 +19,8 @@ const WIN32_OPENSSH_AGENT_PIPE = `\\.\pipe\openssh-ssh-agent`
 // startSSHAgent determines whether the system-wide ssh-agent service of
 // win32_OpenSSH is running.
 func startSSHAgent(ctx context.Context) (string, error) {
-	var args []string
-
-	args = append(args, "-NoProfile", "-NonInteractive", "-Command")
-	args = append(args, "Get-Service ssh-agent | Select Status | ConvertTo-Json")
-
-	cmd := exec.CommandContext(ctx, "PowerShell", args...)
+	cmd := exec.CommandContext(ctx, "PowerShell", "-NoProfile", "-NonInteractive",
+		"-Command", "Get-Service ssh-agent | Select Status | ConvertTo-Json")
 
 	output, err := cmd.Output()
 	if err != nil {

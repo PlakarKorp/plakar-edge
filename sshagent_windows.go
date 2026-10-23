@@ -11,7 +11,7 @@ import (
 )
 
 // Well-known pipe used by the ssh-agent service of win32_OpenSSH
-const WIN32_OPENSSH_AGENT_PIPE = "\\.\\pipe\\openssh-ssh-agent"
+const WIN32_OPENSSH_AGENT_PIPE = `\\.\pipe\openssh-ssh-agent`
 
 // startSSHAgent determines whether the system-wide ssh-agent service of
 // win32_OpenSSH is running.

@@ -18,7 +18,7 @@ const WIN32_OPENSSH_AGENT_PIPE = `\\.\pipe\openssh-ssh-agent`
 func startSSHAgent(ctx context.Context) (string, error) {
 	var args []string
 
-	args = append(args, "-Command")
+	args = append(args, "-NoProfile", "-NonInteractive", "-Command")
 	args = append(args, "Get-Service ssh-agent | " +
 	    "Select Status | Format-List")
 

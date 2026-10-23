@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -104,20 +105,17 @@ func (c *Client) FetchPackage(ctx context.Context, p *pkg.Package, dst string) e
 		}
 	}
 
-	// Write atomically: download to a temp file, then rename into place, so a
-	// partial download can never be mistaken for an installed package.
-	tmp := dst + ".part"
-	f, err := os.Create(tmp)
+	f, err := os.CreateTemp(filepath.Dir(dst), fmt.Sprintf(".%s-part-*", p.Name))
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		f.Close()
-		os.Remove(tmp)
+		os.Remove(f.Name())
 		return err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(tmp)
+		os.Remove(f.Name())
 		return err
 	}
 	return os.Rename(tmp, dst)

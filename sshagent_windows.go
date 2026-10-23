@@ -3,11 +3,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"os/exec"
-	"strings"
+
+	"golang.org/x/sys/windows"
 )
 
 // Well-known pipe used by the ssh-agent service of win32_OpenSSH
@@ -19,44 +22,31 @@ func startSSHAgent(ctx context.Context) (string, error) {
 	var args []string
 
 	args = append(args, "-NoProfile", "-NonInteractive", "-Command")
-	args = append(args, "Get-Service ssh-agent | " +
-	    "Select Status | Format-List")
+	args = append(args, "Get-Service ssh-agent | Select Status | ConvertTo-Json")
 
 	cmd := exec.CommandContext(ctx, "PowerShell", args...)
 
-	stdout, err := cmd.StdoutPipe()
+	output, err := cmd.Output()
 	if err != nil {
-		return "", err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", err
-	}
-
-	// reap process
-	go func() { _ = cmd.Wait(); }()
-
-	buf, err := io.ReadAll(stdout)
-	if err != nil {
-		return "", err
-	}
-
-	if len(buf) > 0 {
-		for line := range strings.Lines(string(buf)) {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" {
-				continue
-			}
-
-			s := strings.Split(trimmed, " : ");
-			if len(s) != 2 {
-				continue
-			}
-			if s[1] == "Running" {
-				return WIN32_OPENSSH_AGENT_PIPE, nil
-			}
+		if ee, ok := errors.AsType[*exec.ExitError](err); ok {
+			return "", fmt.Errorf("Get-Service failed: %w: %s", err,
+				bytes.TrimSpace(ee.Stderr))
 		}
+		return "", fmt.Errorf("Get-Service failed: %w", err)
 	}
 
-	return "", fmt.Errorf("ssh-agent is not running.")
+	type Status struct {
+		Status int `json:"status"`
+	}
+
+	var ret Status
+	if err := json.Unmarshal(output, &ret); err != nil {
+		return "", fmt.Errorf("failed to decode Get-Service output: %w", err)
+	}
+
+	if ret.Status != windows.SERVICE_RUNNING {
+		return "", errors.New("ssh-agent is not running")
+	}
+
+	return WIN32_OPENSSH_AGENT_PIPE, nil
 }

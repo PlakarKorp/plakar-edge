@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/PlakarKorp/pkg"
@@ -18,6 +19,30 @@ import (
 )
 
 const postHookTimeout = time.Minute
+
+type keepalive struct {
+	c  chan struct{}
+	wg sync.WaitGroup
+}
+
+func keepAlive(cb func()) *keepalive {
+	var k keepalive
+	k.c = make(chan struct{})
+	k.wg.Go(func() {
+		cb()
+		select {
+		case <-time.After(15 * time.Second):
+			cb()
+		case <-k.c:
+		}
+	})
+	return &k
+}
+
+func (k *keepalive) Stop() {
+	close(k.c)
+	k.wg.Wait()
+}
 
 // runWork executes one work item by spawning the local plaklet, feeding it the
 // ExecPayload on stdin and forwarding every ExecReply it emits back to the
@@ -40,9 +65,18 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
 	}
 
+	keepalivecb := func(msg string) func() {
+		return func() {
+			clt.Reply(ctx, item.WorkId, Reply{Type: ReplyInfo, Message: msg})
+		}
+	}
+
 	// Make sure the connector packages this work item needs are present, fetching
 	// any that are missing through the control-plane proxy.
-	if err := ensurePackages(ctx, clt, cfg, item); err != nil {
+	k := keepAlive(keepalivecb("fetching packages..."))
+	err := ensurePackages(ctx, clt, cfg, item)
+	k.Stop()
+	if err != nil {
 		fail(err)
 		return
 	}
@@ -50,7 +84,10 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// The pre-job hook exists so the job does not run without it (quiesce a
 	// database, mount a snapshot): a failure aborts the work before plaklet
 	// starts, and the post-job hook is not run -- there is nothing to undo.
-	if err := runHook(ctx, cfg, item, "pre_job", logs); err != nil {
+	k = keepAlive(keepalivecb("running pre-hook..."))
+	err = runHook(ctx, cfg, item, "pre_job", logs)
+	k.Stop()
+	if err != nil {
 		fail(fmt.Errorf("pre-job hook: %w", err))
 		return
 	}
@@ -66,7 +103,10 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// The post-job hook is the pre-job hook's undo: once the pre-job hook ran,
 	// it runs whether plaklet succeeded, failed or died.
 	var postErr error
-	if err := runHook(postCtx, cfg, item, "post_job", logs); err != nil {
+	k = keepAlive(keepalivecb("running post-hook..."))
+	err = runHook(postCtx, cfg, item, "post_job", logs)
+	k.Stop()
+	if err != nil {
 		postErr = fmt.Errorf("post-job hook: %w", err)
 	}
 	logs.Close()

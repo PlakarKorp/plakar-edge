@@ -286,6 +286,7 @@ func TestRunWorkReportsFailureOnSpawnError(t *testing.T) {
 
 	runWork(context.Background(), clt, cfg, item)
 
+	replies = withoutLogs(replies)
 	if len(replies) != 1 || replies[0].Type != ReplyFailure {
 		t.Fatalf("replies = %+v, want one ReplyFailure", replies)
 	}
@@ -304,6 +305,7 @@ func TestRunWorkNoDoubleReplyOnPlakletSuccess(t *testing.T) {
 
 	runWork(context.Background(), clt, cfg, item)
 
+	replies = withoutLogs(replies)
 	if len(replies) != 1 {
 		t.Fatalf("replies = %+v, want exactly 1 (no synthesized failure on top of plaklet's own reply)", replies)
 	}
@@ -390,7 +392,7 @@ func logText(replies []Reply) string {
 func withoutLogs(replies []Reply) []Reply {
 	var out []Reply
 	for _, r := range replies {
-		if r.Type != ReplyLog {
+		if r.Type != ReplyLog && r.Type != ReplyInfo {
 			out = append(out, r)
 		}
 	}

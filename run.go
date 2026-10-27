@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/PlakarKorp/pkg"
@@ -233,6 +234,9 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
 	cmd.Stderr = logs
 	if cfg.SSHAuthSock != "" {
 		cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK="+cfg.SSHAuthSock)

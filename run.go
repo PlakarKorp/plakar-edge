@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/PlakarKorp/pkg"
@@ -19,6 +20,7 @@ import (
 )
 
 const postHookTimeout = time.Minute
+const terminateTimeout = time.Minute
 
 type keepalive struct {
 	c  chan struct{}
@@ -233,6 +235,9 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
 	cmd.Stderr = logs
 	if cfg.SSHAuthSock != "" {
 		cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK="+cfg.SSHAuthSock)
@@ -267,6 +272,29 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 	}
 	stdin.Close()
 
+	procAwaited := make(chan struct{})
+	go func() {
+		select {
+		case <-procAwaited:
+			// Process exited normally, just return.
+			return
+		case <-ctx.Done():
+			// Cancelled requested, force kill after a grace delay.
+		}
+
+		select {
+		case <-procAwaited:
+			// Process terminated correctly, just return.
+			return
+		case <-time.After(terminateTimeout):
+			log.Printf("work %s: grace period expired, killing process", item.WorkId)
+			err := cmd.Process.Kill()
+			if err != nil {
+				log.Printf("work %s: kill failed: %s", item.WorkId, err)
+			}
+		}
+	}()
+
 	// Pump plaklet's reply stream to the control plane, holding the terminal
 	// reply (success/failure) back for the caller.
 	var terminal *ExecReply
@@ -288,6 +316,7 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 	}
 
 	waitErr := cmd.Wait()
+	close(procAwaited)
 
 	// If plaklet died without a terminal reply, report a failure so the
 	// control plane doesn't hang waiting on the work.

@@ -1,15 +1,16 @@
 module github.com/PlakarKorp/plakar-edge
 
-go 1.26.0
+go 1.26.10
 
 require (
-	github.com/PlakarKorp/pkg v1.1.8
-	github.com/PlakarKorp/plaklet v1.1.4-rc.0
+	github.com/PlakarKorp/pkg v1.1.10
+	github.com/PlakarKorp/plaklet v1.1.4-rc.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/node_exporter v1.12.1
 	github.com/shirou/gopsutil/v4 v4.26.6
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -17,7 +18,7 @@ require (
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
-	github.com/PlakarKorp/integration-grpc v1.1.2 // indirect
+	github.com/PlakarKorp/integration-sdk v1.1.1 // indirect
 	github.com/PlakarKorp/integrations/fs v1.1.9 // indirect
 	github.com/PlakarKorp/integrations/http v1.1.3 // indirect
 	github.com/PlakarKorp/integrations/ptar v1.1.1 // indirect
@@ -44,7 +45,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/ema/qdisc v1.0.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
 	github.com/getsentry/sentry-go v0.35.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.9.1 // indirect
@@ -103,8 +104,7 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	google.golang.org/grpc v1.84.0 // indirect

@@ -340,5 +340,9 @@ func forwardReply(ctx context.Context, clt *Client, workID uuid.UUID, r ExecRepl
 		State:   r.State,
 	}); err != nil {
 		log.Printf("work %s: failed to forward reply %q: %v", workID, r.Type, err)
+		switch r.Type {
+		case ReplyInfo, ReplyWarning, ReplyError:
+			log.Printf("work %s: %s: %s", workID, r.Type, r.Message)
+		}
 	}
 }

@@ -37,6 +37,18 @@ type EnrollRequest struct {
 	SystemInfo      SystemInfo `json:"system_info"`
 }
 
+// PoolEnrollRequest enrolls into an edge pool. It names no organization: pool
+// keys are stored hashed, so the control plane looks the pool up by the key's
+// hash and the edge joins that pool's organization.
+type PoolEnrollRequest struct {
+	EnrollmentKey   string     `json:"enrollment_key"`
+	Name            string     `json:"name"`
+	Hostname        string     `json:"hostname"`
+	ProtocolVersion int        `json:"protocol_version"`
+	EdgeVersion     string     `json:"edge_version"`
+	SystemInfo      SystemInfo `json:"system_info"`
+}
+
 type EnrollResponse struct {
 	EdgeId uuid.UUID `json:"edge_id"`
 	Token  string    `json:"token"`

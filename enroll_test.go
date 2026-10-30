@@ -62,7 +62,7 @@ func TestEnrollRetriesThenSucceeds(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
-	st := enroll(context.Background(), NewClient(srv.URL), cfg, testOrg, "key", "edge", "host")
+	st := enroll(context.Background(), cfg, "test", enrollIntoOrganization(NewClient(srv.URL), testOrg, "key", "edge", "host"))
 	if st == nil {
 		t.Fatal("enroll returned nil (context not canceled, should have succeeded)")
 	}
@@ -89,7 +89,7 @@ func TestEnrollReturnsNilOnContextCancel(t *testing.T) {
 	defer cancel()
 
 	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
-	if st := enroll(ctx, NewClient(srv.URL), cfg, testOrg, "key", "edge", "host"); st != nil {
+	if st := enroll(ctx, cfg, "test", enrollIntoOrganization(NewClient(srv.URL), testOrg, "key", "edge", "host")); st != nil {
 		t.Errorf("enroll = %+v, want nil on context cancel", st)
 	}
 }
@@ -115,7 +115,7 @@ func TestEnrollSendsTheOrganization(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
-	if st := enroll(context.Background(), NewClient(srv.URL), cfg, testOrg, "key", "edge", "host"); st == nil {
+	if st := enroll(context.Background(), cfg, "test", enrollIntoOrganization(NewClient(srv.URL), testOrg, "key", "edge", "host")); st == nil {
 		t.Fatal("enroll returned nil, should have succeeded")
 	}
 	if got.OrganizationID != testOrg {
@@ -139,5 +139,85 @@ func TestEnrollRequestUsesTheAgreedFieldName(t *testing.T) {
 	}
 	if _, ok := m["organization_id"]; !ok {
 		t.Errorf("no organization_id in %s", raw)
+	}
+}
+
+// A pool enrollment goes to the pool endpoint with the pool's key and names no
+// organization: the control plane derives it from the pool.
+func TestEnrollIntoPoolSendsTheKeyToThePoolEndpoint(t *testing.T) {
+	var path string
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(EnrollResponse{
+			EdgeId:    uuid.MustParse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+			Token:     "tok",
+			Supported: true,
+		})
+	}))
+	defer srv.Close()
+
+	cfg := &Config{APIURL: srv.URL, StateDir: t.TempDir()}
+	st := enroll(context.Background(), cfg, "test", enrollIntoPool(NewClient(srv.URL), "pool-key", "edge", "host"))
+	if st == nil {
+		t.Fatal("enroll returned nil, should have succeeded")
+	}
+	if st.Token != "tok" {
+		t.Errorf("token = %q, want tok", st.Token)
+	}
+	if path != "/api/v1/edge/pools/enroll" {
+		t.Errorf("path = %s, want /api/v1/edge/pools/enroll", path)
+	}
+	if got["enrollment_key"] != "pool-key" {
+		t.Errorf("enrollment_key = %v, want pool-key", got["enrollment_key"])
+	}
+	if got["name"] != "edge" {
+		t.Errorf("name = %v, want edge", got["name"])
+	}
+	if _, ok := got["organization_id"]; ok {
+		t.Errorf("pool enrollment sent an organization_id: %v", got)
+	}
+}
+
+func TestCheckEnrollFlags(t *testing.T) {
+	tests := []struct {
+		name              string
+		poolKey, key, org string
+		wantErr           bool
+	}{
+		{name: "organization enrollment", key: "k", org: "o"},
+		{name: "pool enrollment", poolKey: "p"},
+		{name: "nothing", wantErr: false},
+		{name: "pool with key", poolKey: "p", key: "k", wantErr: true},
+		{name: "pool with organization", poolKey: "p", org: "o", wantErr: true},
+		{name: "pool with both", poolKey: "p", key: "k", org: "o", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkEnrollFlags(tt.poolKey, tt.key, tt.org)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkEnrollFlags(%q, %q, %q) = %v, wantErr %v", tt.poolKey, tt.key, tt.org, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestPoolEnrollmentKeyOrEnv(t *testing.T) {
+	tests := []struct {
+		name, flag, env, want string
+	}{
+		{name: "flag only", flag: "f", want: "f"},
+		{name: "env only", env: "e", want: "e"},
+		{name: "flag wins over env", flag: "f", env: "e", want: "f"},
+		{name: "neither"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLAKAR_EDGE_POOL_ENROLL_KEY", tt.env)
+			if got := poolEnrollmentKeyOrEnv(tt.flag); got != tt.want {
+				t.Errorf("poolEnrollmentKeyOrEnv(%q) = %q, want %q", tt.flag, got, tt.want)
+			}
+		})
 	}
 }

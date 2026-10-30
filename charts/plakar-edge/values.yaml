@@ -20,7 +20,8 @@ fullnameOverride: ""
 # -- Control plane API base URL, passed as -control-plane. Required.
 controlPlane: ""
 
-# -- ID of the organization these edges enroll into. Required.
+# -- ID of the organization these edges enroll into. Required unless
+# poolEnrollKey is set.
 organization: ""
 
 # -- How long the server holds a poll open, passed as -poll-hold. Leave empty
@@ -51,6 +52,16 @@ enrollKey:
   secretName: ""
   # -- Key within that Secret holding the enrollment key.
   secretKey: enroll-key
+
+# -- Edge pool enrollment key, referenced from an existing Secret like
+# enrollKey. When secretName is set the edges enroll into that pool instead,
+# which decides their organization: organization and enrollKey must then be
+# left empty.
+poolEnrollKey:
+  # -- Name of an existing Secret containing the edge pool enrollment key.
+  secretName: ""
+  # -- Key within that Secret holding the edge pool enrollment key.
+  secretKey: pool-enroll-key
 
 serviceAccount:
   # -- Specifies whether a service account should be created.

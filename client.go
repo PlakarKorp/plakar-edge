@@ -52,6 +52,16 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 	return &resp, nil
 }
 
+// EnrollIntoPool trades an edge pool's enrollment key for a per-edge identity +
+// token; the edge joins that pool.
+func (c *Client) EnrollIntoPool(ctx context.Context, req PoolEnrollRequest) (*EnrollResponse, error) {
+	var resp EnrollResponse
+	if _, err := c.doStatus(ctx, http.MethodPost, "/api/v1/edge/pools/enroll", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 // Poll long-polls for the next work item. Returns (nil, nil) on 204 (no work).
 // The control plane blocks the request server-side; we set a client timeout a
 // little longer than the expected server hold.

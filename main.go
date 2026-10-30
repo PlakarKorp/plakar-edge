@@ -459,7 +459,7 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			// tell the operator to re-enroll rather than spinning forever.
 			if isUnauthorizedError(err) {
 				fatal("control plane rejected our identity (%v); the saved token is invalid for %s. "+
-					"Re-enroll: remove the state dir (%s) and pass -enroll <key>.", err, cfg.APIURL, cfg.StateDir)
+					"Re-enroll: remove the state dir (%s) and pass -enroll <key> or -pool-enroll <key>.", err, cfg.APIURL, cfg.StateDir)
 			}
 			log.Printf("poll error: %v (retrying in %s)", err, backoff)
 			select {

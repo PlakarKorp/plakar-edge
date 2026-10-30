@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/PlakarKorp/pkg v1.1.10
-	github.com/PlakarKorp/plaklet v1.1.4-rc.1
+	github.com/PlakarKorp/plaklet v1.1.4
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2

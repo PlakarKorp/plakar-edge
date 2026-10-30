@@ -88,7 +88,7 @@ likewise retries through control-plane outages.
 | `-control-plane` | *(required)* | Control plane API base URL |
 | `-enroll` | | Enrollment key; required only on first boot. Falls back to `PLAKAR_EDGE_ENROLL_KEY` |
 | `-organization` | | Id of the organization to enroll into; required only on first boot. Falls back to `PLAKAR_EDGE_ORGANIZATION` |
-| `-pool-enroll` | | Edge pool enrollment key: enroll into that pool, and its organization, instead of using `-enroll`/`-organization`. Cannot be combined with either. First boot only |
+| `-pool-enroll` | | Edge pool enrollment key: enroll into that pool, and its organization, instead of using `-enroll`/`-organization`. Cannot be combined with either. First boot only. Falls back to `PLAKAR_EDGE_POOL_ENROLL_KEY` |
 | `-name` | hostname | Edge name registered with the control plane |
 | `-state-dir` | `/var/lib/plakar-edge` | Where the edge identity/token is persisted |
 | `-pkg` | | Plaklet package base dir (`<pkg>/integrations`, `<pkg>/cache`) |

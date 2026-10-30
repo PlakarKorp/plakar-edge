@@ -156,7 +156,7 @@ func main() {
 	flag.StringVar(&cfg.APIURL, "control-plane", "", "plakman control plane API base URL (required)")
 	flag.StringVar(&enrollmentKey, "enroll", "", "enrollment key (required on first run), defaults to PLAKAR_EDGE_ENROLL_KEY if not defined.")
 	flag.StringVar(&organizationID, "organization", "", "id of the organization to enroll into (required on first run), defaults to PLAKAR_EDGE_ORGANIZATION if not defined.")
-	flag.StringVar(&poolEnrollmentKey, "pool-enroll", "", "edge pool enrollment key: enroll into that pool instead of an organization (first run only); excludes -enroll and -organization")
+	flag.StringVar(&poolEnrollmentKey, "pool-enroll", "", "edge pool enrollment key: enroll into that pool instead of an organization (first run only); excludes -enroll and -organization, defaults to PLAKAR_EDGE_POOL_ENROLL_KEY if not defined.")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
@@ -173,6 +173,7 @@ func main() {
 	if cfg.APIURL == "" {
 		fatal("-control-plane is required")
 	}
+	poolEnrollmentKey = poolEnrollmentKeyOrEnv(poolEnrollmentKey)
 	if err := checkEnrollFlags(poolEnrollmentKey, enrollmentKey, organizationID); err != nil {
 		fatal("%v", err)
 	}
@@ -293,6 +294,15 @@ func main() {
 	log.Printf("edge %s shutting down", st.EdgeId)
 }
 
+// poolEnrollmentKeyOrEnv falls back to PLAKAR_EDGE_POOL_ENROLL_KEY when
+// -pool-enroll is not given.
+func poolEnrollmentKeyOrEnv(flagValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	return os.Getenv("PLAKAR_EDGE_POOL_ENROLL_KEY")
+}
+
 // checkEnrollFlags rejects -pool-enroll alongside -enroll or -organization: the
 // pool decides the organization, so either would be ignored.
 func checkEnrollFlags(poolKey, key, organization string) error {
@@ -300,10 +310,10 @@ func checkEnrollFlags(poolKey, key, organization string) error {
 		return nil
 	}
 	if key != "" {
-		return errors.New("-pool-enroll and -enroll are mutually exclusive")
+		return errors.New("-pool-enroll (or PLAKAR_EDGE_POOL_ENROLL_KEY) and -enroll are mutually exclusive")
 	}
 	if organization != "" {
-		return errors.New("-pool-enroll and -organization are mutually exclusive")
+		return errors.New("-pool-enroll (or PLAKAR_EDGE_POOL_ENROLL_KEY) and -organization are mutually exclusive")
 	}
 	return nil
 }

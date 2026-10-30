@@ -202,3 +202,22 @@ func TestCheckEnrollFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestPoolEnrollmentKeyOrEnv(t *testing.T) {
+	tests := []struct {
+		name, flag, env, want string
+	}{
+		{name: "flag only", flag: "f", want: "f"},
+		{name: "env only", env: "e", want: "e"},
+		{name: "flag wins over env", flag: "f", env: "e", want: "f"},
+		{name: "neither"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLAKAR_EDGE_POOL_ENROLL_KEY", tt.env)
+			if got := poolEnrollmentKeyOrEnv(tt.flag); got != tt.want {
+				t.Errorf("poolEnrollmentKeyOrEnv(%q) = %q, want %q", tt.flag, got, tt.want)
+			}
+		})
+	}
+}

@@ -15,7 +15,12 @@ Check enrollment/poll status via logs, e.g. for the first replica:
 
   kubectl logs -n {{ .Release.Namespace }} -f {{ include "plakar-edge.fullname" . }}-0
 
+{{- if .Values.poolEnrollKey.secretName }}
+On first boot each pod enrolls into an edge pool using the key in Secret
+"{{ .Values.poolEnrollKey.secretName }}" (key: {{ .Values.poolEnrollKey.secretKey }})
+{{- else }}
 On first boot each pod enrolls using the key in Secret
 "{{ .Values.enrollKey.secretName }}" (key: {{ .Values.enrollKey.secretKey }})
+{{- end }}
 and persists the resulting token to its own PVC; the enrollment key is not
 required again unless that PVC is lost.

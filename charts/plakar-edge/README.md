@@ -23,7 +23,16 @@ kubectl create secret generic plakar-edge-enroll-key \
   --from-literal=enroll-key=<key from the control plane>
 ```
 
-The chart only references this Secret by name; it never accepts the key
+To enroll into an edge pool instead, put the pool's enrollment key in a
+Secret and set `poolEnrollKey.secretName` in place of `organization` and
+`enrollKey.secretName`; the pool decides the organization:
+
+```sh
+kubectl create secret generic plakar-edge-pool-enroll-key \
+  --from-literal=pool-enroll-key=<edge pool key from the control plane>
+```
+
+The chart only references these Secrets by name; it never accepts the key
 directly in `values.yaml`, so it can't leak into `helm history` or rendered
 manifests.
 
@@ -55,9 +64,11 @@ helm install my-edges ./charts/plakar-edge \
 | `controlPlane` | `""` | Control plane API base URL (required) |
 | `pollHold` | `""` | `-poll-hold`; empty uses the binary's own default |
 | `tags` | `""` | `-tags`; comma-separated list of tags this edge self-reports to the control plane (e.g. `env:prod,zone:eu-1`), same value applied to every replica |
-| `organization` | `""` | Id of the organization these edges enroll into (required) |
-| `enrollKey.secretName` | `""` | Name of an existing Secret with the enrollment key (required) |
+| `organization` | `""` | Id of the organization these edges enroll into (required unless `poolEnrollKey.secretName` is set) |
+| `enrollKey.secretName` | `""` | Name of an existing Secret with the enrollment key (required unless `poolEnrollKey.secretName` is set) |
 | `enrollKey.secretKey` | `enroll-key` | Key within that Secret |
+| `poolEnrollKey.secretName` | `""` | Name of an existing Secret with an edge pool enrollment key; enrolls into that pool. Excludes `organization` and `enrollKey.secretName` |
+| `poolEnrollKey.secretKey` | `pool-enroll-key` | Key within that Secret |
 | `persistence.size` | `5Gi` | PVC size per replica |
 | `persistence.storageClassName` | `""` | StorageClass; empty uses the cluster default |
 | `persistence.mountPath` | `/data` | Mount path; `-state-dir`/`-pkg` are `<mountPath>/state` and `<mountPath>/pkg` |

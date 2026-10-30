@@ -151,11 +151,12 @@ func main() {
 	}
 
 	var cfg Config
-	var enrollmentKey, organizationID, name, rawTags string
+	var enrollmentKey, organizationID, poolEnrollmentKey, name, rawTags string
 
 	flag.StringVar(&cfg.APIURL, "control-plane", "", "plakman control plane API base URL (required)")
 	flag.StringVar(&enrollmentKey, "enroll", "", "enrollment key (required on first run), defaults to PLAKAR_EDGE_ENROLL_KEY if not defined.")
 	flag.StringVar(&organizationID, "organization", "", "id of the organization to enroll into (required on first run), defaults to PLAKAR_EDGE_ORGANIZATION if not defined.")
+	flag.StringVar(&poolEnrollmentKey, "pool-enroll", "", "edge pool enrollment key: enroll into that pool instead of an organization (first run only); excludes -enroll and -organization")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
 	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
@@ -171,6 +172,9 @@ func main() {
 
 	if cfg.APIURL == "" {
 		fatal("-control-plane is required")
+	}
+	if err := checkEnrollFlags(poolEnrollmentKey, enrollmentKey, organizationID); err != nil {
+		fatal("%v", err)
 	}
 
 	// Default the package dir under the state dir, and make it absolute so the
@@ -217,6 +221,15 @@ func main() {
 	switch {
 	case err == nil:
 		log.Printf("resuming as edge %s", st.EdgeId)
+	case os.IsNotExist(err) && poolEnrollmentKey != "":
+		if err := checkStateWritable(&cfg); err != nil {
+			fatal("state directory %q is not writable: %v", cfg.StateDir, err)
+		}
+		st = enroll(rootCtx, &cfg, fmt.Sprintf("%q into an edge pool", name),
+			enrollIntoPool(clt, poolEnrollmentKey, name, hostname))
+		if st == nil {
+			return // context canceled during enrollment (SIGTERM)
+		}
 	case os.IsNotExist(err):
 		if enrollmentKey == "" {
 			p, ok := os.LookupEnv("PLAKAR_EDGE_ENROLL_KEY")
@@ -252,7 +265,8 @@ func main() {
 		if err := checkStateWritable(&cfg); err != nil {
 			fatal("state directory %q is not writable: %v", cfg.StateDir, err)
 		}
-		st = enroll(rootCtx, clt, &cfg, orgID, enrollmentKey, name, hostname)
+		st = enroll(rootCtx, &cfg, fmt.Sprintf("%q into organization %s", name, orgID),
+			enrollIntoOrganization(clt, orgID, enrollmentKey, name, hostname))
 		if st == nil {
 			return // context canceled during enrollment (SIGTERM)
 		}
@@ -279,6 +293,48 @@ func main() {
 	log.Printf("edge %s shutting down", st.EdgeId)
 }
 
+// checkEnrollFlags rejects -pool-enroll alongside -enroll or -organization: the
+// pool decides the organization, so either would be ignored.
+func checkEnrollFlags(poolKey, key, organization string) error {
+	if poolKey == "" {
+		return nil
+	}
+	if key != "" {
+		return errors.New("-pool-enroll and -enroll are mutually exclusive")
+	}
+	if organization != "" {
+		return errors.New("-pool-enroll and -organization are mutually exclusive")
+	}
+	return nil
+}
+
+func enrollIntoOrganization(clt *Client, orgID uuid.UUID, key, name, hostname string) func(context.Context) (*EnrollResponse, error) {
+	return func(ctx context.Context) (*EnrollResponse, error) {
+		return clt.Enroll(ctx, EnrollRequest{
+			OrganizationID:  orgID,
+			EnrollmentKey:   key,
+			Name:            name,
+			Hostname:        hostname,
+			ProtocolVersion: EdgeProtocolVersion,
+			EdgeVersion:     Version,
+			SystemInfo:      gatherSystemInfo(),
+		})
+	}
+}
+
+func enrollIntoPool(clt *Client, key, name, hostname string) func(context.Context) (*EnrollResponse, error) {
+	return func(ctx context.Context) (*EnrollResponse, error) {
+		return clt.EnrollIntoPool(ctx, PoolEnrollRequest{
+			EnrollmentKey:   key,
+			Name:            name,
+			Hostname:        hostname,
+			ProtocolVersion: EdgeProtocolVersion,
+			EdgeVersion:     Version,
+			SystemInfo:      gatherSystemInfo(),
+		})
+	}
+}
+
 // enrollRetryDelay is how long enrollment waits between attempts when the
 // control plane is unreachable or erroring transiently. A var (not const) so
 // tests can shorten it.
@@ -288,22 +344,14 @@ var enrollRetryDelay = 5 * time.Second
 // 5xx) until it succeeds or the context is canceled. A definitive rejection
 // (4xx — e.g. a wrong/absent enrollment key) is fatal: retrying it is pointless.
 // Returns nil only if the context is canceled before enrollment succeeds.
-func enroll(ctx context.Context, clt *Client, cfg *Config, orgID uuid.UUID, key, name, hostname string) *state {
+// send makes one attempt; into describes what is joined, for the log.
+func enroll(ctx context.Context, cfg *Config, into string, send func(context.Context) (*EnrollResponse, error)) *state {
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
-		log.Printf("enrolling as %q into organization %s against %s (protocol v%d)",
-			name, orgID, cfg.APIURL, EdgeProtocolVersion)
-		resp, err := clt.Enroll(ctx, EnrollRequest{
-			OrganizationID:  orgID,
-			EnrollmentKey:   key,
-			Name:            name,
-			Hostname:        hostname,
-			ProtocolVersion: EdgeProtocolVersion,
-			EdgeVersion:     Version,
-			SystemInfo:      gatherSystemInfo(),
-		})
+		log.Printf("enrolling %s against %s (protocol v%d)", into, cfg.APIURL, EdgeProtocolVersion)
+		resp, err := send(ctx)
 		if err != nil {
 			// A 4xx is a definitive rejection (bad key, name taken, bad
 			// request): retrying it will never succeed, so exit fatally.

@@ -3,8 +3,9 @@ module github.com/PlakarKorp/plakar-edge
 go 1.26.10
 
 require (
+	github.com/PlakarKorp/go-signify v0.1.0
 	github.com/PlakarKorp/pkg v1.1.10
-	github.com/PlakarKorp/plaklet v1.1.7-0.20261102151552-91dda21ca5e7
+	github.com/PlakarKorp/plaklet v1.1.7-0.20261102170825-9a826fd3bfca
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -24,7 +25,7 @@ require (
 	github.com/PlakarKorp/integrations/ptar v1.1.1 // indirect
 	github.com/PlakarKorp/integrations/stdio v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/tar v1.1.1 // indirect
-	github.com/PlakarKorp/kloset v1.1.11 // indirect
+	github.com/PlakarKorp/kloset v1.1.13 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
@@ -43,6 +44,7 @@ require (
 	github.com/dennwc/btrfs v0.0.0-20260222081608-edfb8b9e4f55 // indirect
 	github.com/dennwc/ioctl v1.0.1-0.20181021180353-017804252068 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebfe/bcrypt_pbkdf v0.0.0-20140212075826-3c8d2dcb253a // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/ema/qdisc v1.0.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.16 // indirect

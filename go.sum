@@ -8,6 +8,8 @@ github.com/PlakarKorp/go-cdc-chunkers v1.1.0 h1:XJKDpvncPc7ZNo830Kk5MRqOhbCLi5Ga
 github.com/PlakarKorp/go-cdc-chunkers v1.1.0/go.mod h1:y7ag92JABKPBDoSOPwedssQ5NIOgjRm4Mu6yTBpmUMY=
 github.com/PlakarKorp/go-human2duration v0.1.6 h1:pRPAU3yX4ROV7RihXihPkwyjoQNI1lnemjAMFdWRwi8=
 github.com/PlakarKorp/go-human2duration v0.1.6/go.mod h1:1kg75kTlYCYURVyciaeO2GFdLgGDMhIfBTBpfydv1sk=
+github.com/PlakarKorp/go-signify v0.1.0 h1:kdoOKOLFm3TV8iiLWv4I+Rj0xkz+5yRvAyhE7fKwxZk=
+github.com/PlakarKorp/go-signify v0.1.0/go.mod h1:3s+TD9DBxuBmEJGADEYLZ5ax2SwjgcO3ofrfCtqC8/E=
 github.com/PlakarKorp/integration-grpc v1.1.2 h1:fSTa9fv3bFgRMkkbKHf3zeS3OapK3Jy2cYJxLK8qGWI=
 github.com/PlakarKorp/integration-grpc v1.1.2/go.mod h1:/QMbuiV5qJFUhYg/Xc98FVXa9tiH4dBCAKc5FwjMFXU=
 github.com/PlakarKorp/integrations/fs v1.1.9 h1:9RBSGKDynzDCAbkhZelaIYJLYfGkr5zh3IgEsWiHXlY=
@@ -20,12 +22,12 @@ github.com/PlakarKorp/integrations/stdio v1.1.0 h1:kvZma7XfqW4p21DH/mHUC4WTa3tiP
 github.com/PlakarKorp/integrations/stdio v1.1.0/go.mod h1:Hoef62hqivDoEFC4ewyUE1ZAFSd6Kncd2Wr+R7tBcug=
 github.com/PlakarKorp/integrations/tar v1.1.1 h1:2v1BF5LLE88vm8C6ZbzhCOEXv44js9MSbfCq/qbOokc=
 github.com/PlakarKorp/integrations/tar v1.1.1/go.mod h1:lq8UXspuZFCKqOZUsUL9f4pM3xWXqZNeLTAc7GIBMsg=
-github.com/PlakarKorp/kloset v1.1.11 h1:6tlC2s7eV5WNOPbdEEa9ALjTk5xsm5t2Qd2T9dqGxDk=
-github.com/PlakarKorp/kloset v1.1.11/go.mod h1:tDJRg9YBSmgJHQJzNubt+jZiETRcakPUpbO7PFcYUNM=
+github.com/PlakarKorp/kloset v1.1.13 h1:5VCglQtauLgTHkNGvhKg+hVITNkfE85lycwAlnlD4GA=
+github.com/PlakarKorp/kloset v1.1.13/go.mod h1:tDJRg9YBSmgJHQJzNubt+jZiETRcakPUpbO7PFcYUNM=
 github.com/PlakarKorp/pkg v1.1.10 h1:ANLwjGDd0ym2DL6Lpz4V1XF3dGwCj0MPcfyB3mpD+O8=
 github.com/PlakarKorp/pkg v1.1.10/go.mod h1:fr6EcmMssAZ9ab1f5Wq8P8K259Ir3Nd4BtRs71GKI30=
-github.com/PlakarKorp/plaklet v1.1.7-0.20261102151552-91dda21ca5e7 h1:a7RPh9pK3xKxbTmGi6jdxtn87pUZtnQDI7NVUcPXopQ=
-github.com/PlakarKorp/plaklet v1.1.7-0.20261102151552-91dda21ca5e7/go.mod h1:jDBzz/VAOdWMtPaUZqMcyZflpGpadAmqHnfWsxypMMM=
+github.com/PlakarKorp/plaklet v1.1.7-0.20261102170825-9a826fd3bfca h1:cBPDZ1lKHZO2X+AO2UbXMgxB6kN222UMq9hwB5H9BOc=
+github.com/PlakarKorp/plaklet v1.1.7-0.20261102170825-9a826fd3bfca/go.mod h1:8mDmIqbJ30oG1SLzuxm65Y4AfX9dzeHMF5DMXsWQMig=
 github.com/RaduBerinde/axisds v0.1.0 h1:YItk/RmU5nvlsv/awo2Fjx97Mfpt4JfgtEVAGPrLdz8=
 github.com/RaduBerinde/axisds v0.1.0/go.mod h1:UHGJonU9z4YYGKJxSaC6/TNcLOBptpmM5m2Cksbnw0Y=
 github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 h1:0s1dtMVp3XcQ1tHazU9OCLCKoqj4TRD8GFU5SscItMM=
@@ -77,6 +79,8 @@ github.com/dennwc/ioctl v1.0.1-0.20181021180353-017804252068 h1:K71w/n/Y74EQsKo9
 github.com/dennwc/ioctl v1.0.1-0.20181021180353-017804252068/go.mod h1:ellh2YB5ldny99SBU/VX7Nq0xiZbHphf1DrtHxxjMk0=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
+github.com/ebfe/bcrypt_pbkdf v0.0.0-20140212075826-3c8d2dcb253a h1:YtdtTUN1iH97s+6PUjLnaiKSQj4oG1/EZ3N9bx6g4kU=
+github.com/ebfe/bcrypt_pbkdf v0.0.0-20140212075826-3c8d2dcb253a/go.mod h1:/CZpbhAusDOobpcb9yubw46kdYjq0zRC0Wpg9a9zFQM=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/ema/qdisc v1.0.0 h1:EHLG08FVRbWLg8uRICa3xzC9Zm0m7HyMHfXobWFnXYg=

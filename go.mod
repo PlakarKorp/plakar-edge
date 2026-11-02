@@ -5,7 +5,7 @@ go 1.26.10
 require (
 	github.com/PlakarKorp/go-signify v0.1.0
 	github.com/PlakarKorp/pkg v1.1.10
-	github.com/PlakarKorp/plaklet v1.1.7-0.20261102170825-9a826fd3bfca
+	github.com/PlakarKorp/plaklet v1.1.7
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -17,6 +17,7 @@ require (
 require (
 	cyphar.com/go-pathrs v0.2.2 // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
+	github.com/PlakarKorp/aes-gcm-siv v0.0.0-20260921114103-b2704f58f4a4 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
 	github.com/PlakarKorp/integration-grpc v1.1.2 // indirect
@@ -25,7 +26,7 @@ require (
 	github.com/PlakarKorp/integrations/ptar v1.1.1 // indirect
 	github.com/PlakarKorp/integrations/stdio v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/tar v1.1.1 // indirect
-	github.com/PlakarKorp/kloset v1.1.13 // indirect
+	github.com/PlakarKorp/kloset v1.1.15 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
@@ -47,6 +48,8 @@ require (
 	github.com/ebfe/bcrypt_pbkdf v0.0.0-20140212075826-3c8d2dcb253a // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/ema/qdisc v1.0.0 // indirect
+	github.com/ericlagergren/polyval v0.0.0-20220411101811-e25bc10ba391 // indirect
+	github.com/ericlagergren/subtle v0.0.0-20220507045147-890d697da010 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
 	github.com/getsentry/sentry-go v0.35.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -91,7 +94,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/safchain/ethtool v0.7.0 // indirect
-	github.com/tink-crypto/tink-go/v2 v2.6.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect

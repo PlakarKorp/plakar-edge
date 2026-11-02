@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/PlakarKorp/pkg v1.1.10
-	github.com/PlakarKorp/plaklet v1.1.4-rc.1
+	github.com/PlakarKorp/plaklet v1.1.7-0.20261102151552-91dda21ca5e7
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -18,13 +18,13 @@ require (
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
-	github.com/PlakarKorp/integration-sdk v1.1.1 // indirect
+	github.com/PlakarKorp/integration-grpc v1.1.2 // indirect
 	github.com/PlakarKorp/integrations/fs v1.1.9 // indirect
 	github.com/PlakarKorp/integrations/http v1.1.3 // indirect
 	github.com/PlakarKorp/integrations/ptar v1.1.1 // indirect
 	github.com/PlakarKorp/integrations/stdio v1.1.0 // indirect
 	github.com/PlakarKorp/integrations/tar v1.1.1 // indirect
-	github.com/PlakarKorp/kloset v1.1.9-rc.0 // indirect
+	github.com/PlakarKorp/kloset v1.1.11 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect

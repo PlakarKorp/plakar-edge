@@ -5,7 +5,7 @@ go 1.26.10
 require (
 	github.com/PlakarKorp/go-signify v0.1.0
 	github.com/PlakarKorp/pkg v1.1.10
-	github.com/PlakarKorp/plaklet v1.1.7
+	github.com/PlakarKorp/plaklet v1.1.8
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -20,6 +20,7 @@ require (
 	github.com/PlakarKorp/aes-gcm-siv v0.0.0-20260921114103-b2704f58f4a4 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
+	github.com/PlakarKorp/go-inventory-sdk v1.1.2 // indirect
 	github.com/PlakarKorp/integration-grpc v1.1.2 // indirect
 	github.com/PlakarKorp/integrations/fs v1.1.9 // indirect
 	github.com/PlakarKorp/integrations/http v1.1.3 // indirect

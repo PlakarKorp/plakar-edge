@@ -10,6 +10,8 @@ github.com/PlakarKorp/go-cdc-chunkers v1.1.0 h1:XJKDpvncPc7ZNo830Kk5MRqOhbCLi5Ga
 github.com/PlakarKorp/go-cdc-chunkers v1.1.0/go.mod h1:y7ag92JABKPBDoSOPwedssQ5NIOgjRm4Mu6yTBpmUMY=
 github.com/PlakarKorp/go-human2duration v0.1.6 h1:pRPAU3yX4ROV7RihXihPkwyjoQNI1lnemjAMFdWRwi8=
 github.com/PlakarKorp/go-human2duration v0.1.6/go.mod h1:1kg75kTlYCYURVyciaeO2GFdLgGDMhIfBTBpfydv1sk=
+github.com/PlakarKorp/go-inventory-sdk v1.1.2 h1:iJsHnX6GHQY+za9DzDFPZQtEpwEaqVwdEcdb97jLkkA=
+github.com/PlakarKorp/go-inventory-sdk v1.1.2/go.mod h1:42uReScbDc4DK4g2Y2zNOo3loxEM5xdlegmqfDZO40k=
 github.com/PlakarKorp/go-signify v0.1.0 h1:kdoOKOLFm3TV8iiLWv4I+Rj0xkz+5yRvAyhE7fKwxZk=
 github.com/PlakarKorp/go-signify v0.1.0/go.mod h1:3s+TD9DBxuBmEJGADEYLZ5ax2SwjgcO3ofrfCtqC8/E=
 github.com/PlakarKorp/integration-grpc v1.1.2 h1:fSTa9fv3bFgRMkkbKHf3zeS3OapK3Jy2cYJxLK8qGWI=
@@ -28,8 +30,8 @@ github.com/PlakarKorp/kloset v1.1.15 h1:Sxu9GshnuFmEhIwIdG8CQv9+oqv2BGM7H3Ryq1QY
 github.com/PlakarKorp/kloset v1.1.15/go.mod h1:hJPpmxRac1cvO49z3n+UxFS55SaMV1HihQQ1N9gAyRU=
 github.com/PlakarKorp/pkg v1.1.10 h1:ANLwjGDd0ym2DL6Lpz4V1XF3dGwCj0MPcfyB3mpD+O8=
 github.com/PlakarKorp/pkg v1.1.10/go.mod h1:fr6EcmMssAZ9ab1f5Wq8P8K259Ir3Nd4BtRs71GKI30=
-github.com/PlakarKorp/plaklet v1.1.7 h1:8Fq+RasaxPKi41XuPDre3HL4Kj6PzDa5Nfh/6wzVnrs=
-github.com/PlakarKorp/plaklet v1.1.7/go.mod h1:qhfNOMHMeGFf61/QdMq+L3lWEVvOSJu4ojk0DA2B73c=
+github.com/PlakarKorp/plaklet v1.1.8 h1:V641N87B3RLekCGrotkcEJzalNSGObqyLGDYpMIB6Zs=
+github.com/PlakarKorp/plaklet v1.1.8/go.mod h1:jRMc509kH0B/hB9rf89qnZDVl9ZWq9j4h+EwqeYWR2o=
 github.com/RaduBerinde/axisds v0.1.0 h1:YItk/RmU5nvlsv/awo2Fjx97Mfpt4JfgtEVAGPrLdz8=
 github.com/RaduBerinde/axisds v0.1.0/go.mod h1:UHGJonU9z4YYGKJxSaC6/TNcLOBptpmM5m2Cksbnw0Y=
 github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 h1:0s1dtMVp3XcQ1tHazU9OCLCKoqj4TRD8GFU5SscItMM=

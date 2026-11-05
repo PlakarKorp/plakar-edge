@@ -27,6 +27,9 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/PlakarKorp/integrations/fs/exporter"
+	_ "github.com/PlakarKorp/integrations/fs/importer"
+	_ "github.com/PlakarKorp/integrations/fs/storage"
 	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )

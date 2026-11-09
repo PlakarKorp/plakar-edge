@@ -5,7 +5,7 @@ go 1.26.10
 require (
 	github.com/PlakarKorp/integrations/fs v1.1.11-0.20261105083541-b2996ec3e4f8
 	github.com/PlakarKorp/pkg v1.1.11
-	github.com/PlakarKorp/plaklet v1.1.6-0.20261105092516-d5665e9c4691
+	github.com/PlakarKorp/plaklet v1.1.6-0.20261109140452-e51d1d47e1c5
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2

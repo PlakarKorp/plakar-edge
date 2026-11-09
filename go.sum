@@ -22,8 +22,8 @@ github.com/PlakarKorp/kloset v1.2.0-alpha.5.0.20261104130946-2766a7d9ab9c h1:qUB
 github.com/PlakarKorp/kloset v1.2.0-alpha.5.0.20261104130946-2766a7d9ab9c/go.mod h1:9bl3IvOPGHY3Vm85T6k4XZo3gkAVrZOnq36XB1daCko=
 github.com/PlakarKorp/pkg v1.1.11 h1:mKvW/qUfrwDsxBYBQhaOBEcOcM/jcMu8i/VcOztE3SM=
 github.com/PlakarKorp/pkg v1.1.11/go.mod h1:S8y8cfbQxtTvmVZH+7RJaqjf5qcOzlGyAbMxQBEsu3c=
-github.com/PlakarKorp/plaklet v1.1.6-0.20261105092516-d5665e9c4691 h1:gEUGwZbxAec0jP121wojftysYKT53+whAMLQC3sgxDw=
-github.com/PlakarKorp/plaklet v1.1.6-0.20261105092516-d5665e9c4691/go.mod h1:Sm22pL/onmcCsF6NqApNCnh3UnUWlJ6KoV4/9DWbDKM=
+github.com/PlakarKorp/plaklet v1.1.6-0.20261109140452-e51d1d47e1c5 h1:vHeHG/rhidIS0JdP4/Cq8P8WQoJX8H0TkquqkCZliUc=
+github.com/PlakarKorp/plaklet v1.1.6-0.20261109140452-e51d1d47e1c5/go.mod h1:Sm22pL/onmcCsF6NqApNCnh3UnUWlJ6KoV4/9DWbDKM=
 github.com/RaduBerinde/axisds v0.1.0 h1:YItk/RmU5nvlsv/awo2Fjx97Mfpt4JfgtEVAGPrLdz8=
 github.com/RaduBerinde/axisds v0.1.0/go.mod h1:UHGJonU9z4YYGKJxSaC6/TNcLOBptpmM5m2Cksbnw0Y=
 github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 h1:0s1dtMVp3XcQ1tHazU9OCLCKoqj4TRD8GFU5SscItMM=

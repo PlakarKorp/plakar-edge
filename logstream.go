@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -100,7 +101,7 @@ func (s *logStreamer) flush(final bool) {
 		if !ok {
 			return
 		}
-		if err := s.clt.Reply(s.ctx, s.workID, Reply{Type: ReplyLog, Message: chunk}); err != nil {
+		if err := s.clt.Reply(s.ctx, s.workID, plaklet.ExecReply{Type: plaklet.ReplyLog, Message: chunk}); err != nil {
 			// The chunk is gone: mark the log so the gap is not silent.
 			s.mu.Lock()
 			s.truncated = true

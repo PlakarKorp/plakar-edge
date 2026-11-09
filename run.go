@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/PlakarKorp/pkg"
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -64,12 +65,12 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	fail := func(err error) {
 		logs.Close()
 		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), err)
-		_ = clt.Reply(ctx, item.WorkId, Reply{Type: ReplyFailure, Message: err.Error()})
+		_ = clt.Reply(ctx, item.WorkId, plaklet.ExecReply{Type: plaklet.ReplyFailure, Message: err.Error()})
 	}
 
 	keepalivecb := func(msg string) func() {
 		return func() {
-			clt.Reply(ctx, item.WorkId, Reply{Type: ReplyInfo, Message: msg})
+			clt.Reply(ctx, item.WorkId, plaklet.ExecReply{Type: plaklet.ReplyInfo, Message: msg})
 		}
 	}
 
@@ -116,7 +117,7 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	if plakletErr != nil {
 		if postErr != nil {
 			log.Printf("work %s: %v", item.WorkId, postErr)
-			forwardReply(ctx, clt, item.WorkId, ExecReply{Type: ReplyError, Message: postErr.Error()})
+			forwardReply(ctx, clt, item.WorkId, plaklet.ExecReply{Type: plaklet.ReplyError, Message: postErr.Error()})
 		}
 		fail(plakletErr)
 		return
@@ -125,10 +126,10 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// Plaklet succeeded but its cleanup did not: the work failed -- a frozen
 	// database left frozen is not a success. The report/state plaklet
 	// produced still ride along, the backup itself is real.
-	if terminal.Type == ReplySuccess && postErr != nil {
+	if terminal.Type == plaklet.ReplySuccess && postErr != nil {
 		log.Printf("work %s (%s) failed after %s: %v", item.WorkId, item.Op, time.Since(start), postErr)
-		_ = clt.Reply(ctx, item.WorkId, Reply{
-			Type:    ReplyFailure,
+		_ = clt.Reply(ctx, item.WorkId, plaklet.ExecReply{
+			Type:    plaklet.ReplyFailure,
 			Message: postErr.Error(),
 			Report:  terminal.Report,
 			State:   terminal.State,
@@ -140,11 +141,11 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// alongside, not as a second terminal.
 	if postErr != nil {
 		log.Printf("work %s: %v", item.WorkId, postErr)
-		forwardReply(ctx, clt, item.WorkId, ExecReply{Type: ReplyError, Message: postErr.Error()})
+		forwardReply(ctx, clt, item.WorkId, plaklet.ExecReply{Type: plaklet.ReplyError, Message: postErr.Error()})
 	}
 
 	forwardReply(ctx, clt, item.WorkId, *terminal)
-	if terminal.Type == ReplySuccess {
+	if terminal.Type == plaklet.ReplySuccess {
 		log.Printf("work %s (%s) succeeded in %s", item.WorkId, item.Op, time.Since(start))
 	} else {
 		log.Printf("work %s (%s) failed after %s: %s", item.WorkId, item.Op, time.Since(start), terminal.Message)
@@ -161,7 +162,7 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 	}
 
 	seen := map[string]bool{}
-	for _, conf := range []*Configuration{item.Source, item.Target} {
+	for _, conf := range []*plaklet.Configuration{item.Source, item.Target} {
 		if conf == nil || conf.Integration.Name == "" {
 			continue
 		}
@@ -204,7 +205,7 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 // it after the post-job hook has had its say. A nil reply with a non-nil error
 // means plaklet died without a result and the caller must synthesize the
 // terminal failure. Plaklet's stderr goes to logs.
-func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem, logs io.Writer) (*ExecReply, error) {
+func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem, logs io.Writer) (*plaklet.ExecReply, error) {
 	plakletArgs := []string{"-pkg", cfg.plakletPkgDir(), "-cache", cfg.plakletCacheDir(), "-quiet"}
 
 	// Honor the task's execution limits (set on the scheduler task as
@@ -259,7 +260,7 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 		return nil, fmt.Errorf("failed to start plaklet: %w", err)
 	}
 
-	payload := ExecPayload{
+	payload := plaklet.ExecPayload{
 		Op:         item.Op,
 		TaskConfig: item.TaskConfig,
 		Source:     item.Source,
@@ -297,10 +298,10 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 
 	// Pump plaklet's reply stream to the control plane, holding the terminal
 	// reply (success/failure) back for the caller.
-	var terminal *ExecReply
+	var terminal *plaklet.ExecReply
 	dec := json.NewDecoder(stdout)
 	for {
-		var r ExecReply
+		var r plaklet.ExecReply
 		if err := dec.Decode(&r); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -308,7 +309,7 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 			log.Printf("work %s: decode plaklet reply: %v", item.WorkId, err)
 			break
 		}
-		if (r.Type == ReplySuccess || r.Type == ReplyFailure) && terminal == nil {
+		if (r.Type == plaklet.ReplySuccess || r.Type == plaklet.ReplyFailure) && terminal == nil {
 			terminal = &r
 			continue
 		}
@@ -332,16 +333,11 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 
 // forwardReply relays a single plaklet ExecReply to the control plane as an edge
 // Reply. The report/state raw JSON is passed through untouched.
-func forwardReply(ctx context.Context, clt *Client, workID uuid.UUID, r ExecReply) {
-	if err := clt.Reply(ctx, workID, Reply{
-		Type:    r.Type,
-		Message: r.Message,
-		Report:  r.Report,
-		State:   r.State,
-	}); err != nil {
+func forwardReply(ctx context.Context, clt *Client, workID uuid.UUID, r plaklet.ExecReply) {
+	if err := clt.Reply(ctx, workID, r); err != nil {
 		log.Printf("work %s: failed to forward reply %q: %v", workID, r.Type, err)
 		switch r.Type {
-		case ReplyInfo, ReplyWarning, ReplyError:
+		case plaklet.ReplyInfo, plaklet.ReplyWarning, plaklet.ReplyError:
 			log.Printf("work %s: %s: %s", workID, r.Type, r.Message)
 		}
 	}

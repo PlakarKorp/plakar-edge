@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/PlakarKorp/pkg"
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -81,7 +82,7 @@ func (c *Client) Poll(ctx context.Context, hold time.Duration, req PollRequest) 
 }
 
 // Reply posts one reply for a work item back to the control plane.
-func (c *Client) Reply(ctx context.Context, workID uuid.UUID, reply Reply) error {
+func (c *Client) Reply(ctx context.Context, workID uuid.UUID, reply plaklet.ExecReply) error {
 	path := fmt.Sprintf("/api/v1/edge/%s/reply", workID)
 	_, err := c.doStatus(ctx, http.MethodPost, path, reply, nil)
 	return err

@@ -3,9 +3,9 @@ module github.com/PlakarKorp/plakar-edge
 go 1.26.10
 
 require (
-	github.com/PlakarKorp/integrations/fs v1.1.11-0.20261105083541-b2996ec3e4f8
-	github.com/PlakarKorp/pkg v1.1.11
-	github.com/PlakarKorp/plaklet v1.1.6-0.20261109140452-e51d1d47e1c5
+	github.com/PlakarKorp/integrations/fs v1.1.12
+	github.com/PlakarKorp/pkg v1.1.12
+	github.com/PlakarKorp/plaklet v1.1.9-rc.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.2
@@ -20,8 +20,8 @@ require (
 	github.com/PlakarKorp/aes-gcm-siv v0.1.0 // indirect
 	github.com/PlakarKorp/go-cdc-chunkers v1.1.0 // indirect
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
-	github.com/PlakarKorp/integration-sdk v1.1.4 // indirect
-	github.com/PlakarKorp/integrations/ptar v1.1.3-0.20261104201232-8e9dc877ede0 // indirect
+	github.com/PlakarKorp/integration-sdk v1.1.5 // indirect
+	github.com/PlakarKorp/integrations/ptar v1.1.3 // indirect
 	github.com/PlakarKorp/kloset v1.2.0-alpha.5.0.20261104130946-2766a7d9ab9c // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect

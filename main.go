@@ -43,6 +43,8 @@ var Version = "v1.1.7"
 type Config struct {
 	APIURL   string
 	StateDir string
+
+	PackfilesBuildDir string
 	// PlakletBin overrides the executor binary. In production it is always empty
 	// — the daemon re-execs itself with the "plaklet" subcommand. It exists only
 	// so tests can inject a fake plaklet; there is no CLI flag for it.
@@ -166,7 +168,8 @@ func main() {
 	flag.StringVar(&organizationID, "organization", "", "id of the organization to enroll into (required on first run), defaults to PLAKAR_EDGE_ORGANIZATION if not defined.")
 	flag.StringVar(&poolEnrollmentKey, "pool-enroll", "", "edge pool enrollment key: enroll into that pool instead of an organization (first run only); excludes -enroll and -organization, defaults to PLAKAR_EDGE_POOL_ENROLL_KEY if not defined.")
 	flag.StringVar(&name, "name", "", "edge name to register (defaults to hostname)")
-	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge identity")
+	flag.StringVar(&cfg.StateDir, "state-dir", "/var/lib/plakar-edge", "directory for persisted edge data")
+	flag.StringVar(&cfg.PackfilesBuildDir, "packfiles-build-dir", "", "directory where temporary packfiles are created (default: <state-dir>/tmp/packfiles-build)")
 	flag.StringVar(&cfg.PkgDir, "pkg", "", "plaklet package base dir (default: <state-dir>/pkg)")
 	flag.DurationVar(&cfg.PollHold, "poll-hold", 30*time.Second, "how long the server holds a poll open")
 	flag.IntVar(&cfg.MaxParallel, "max-parallel", 5, "maximum number of tasks to run concurrently")
@@ -194,6 +197,13 @@ func main() {
 	}
 	if abs, err := filepath.Abs(cfg.PkgDir); err == nil {
 		cfg.PkgDir = abs
+	}
+
+	if cfg.PackfilesBuildDir == "" {
+		cfg.PackfilesBuildDir = filepath.Join(cfg.StateDir, "tmp", "packfiles-build")
+	}
+	if abs, err := filepath.Abs(cfg.PackfilesBuildDir); err == nil {
+		cfg.PackfilesBuildDir = abs
 	}
 
 	// Same reasoning for the scripts dir: hook scripts must resolve to the
@@ -285,6 +295,10 @@ func main() {
 		}
 	default:
 		fatal("failed to read state: %v", err)
+	}
+
+	if err := os.MkdirAll(cfg.PackfilesBuildDir, 0o700); err != nil {
+		fatal("failed to create %s: %v", cfg.PackfilesBuildDir, err)
 	}
 
 	clt.SetToken(st.Token)

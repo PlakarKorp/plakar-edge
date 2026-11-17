@@ -46,6 +46,8 @@ spec:
             - {{ .Values.persistence.mountPath }}/state
             - -pkg
             - {{ .Values.persistence.mountPath }}/pkg
+            - -packfiles-build-dir
+            - {{ .Values.persistence.mountPath }}/packfiles-build
             {{- if .Values.pollHold }}
             - -poll-hold
             - {{ .Values.pollHold | quote }}

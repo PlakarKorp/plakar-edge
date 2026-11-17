@@ -239,8 +239,9 @@ func spawnPlaklet(ctx context.Context, clt *Client, cfg *Config, item *WorkItem,
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
 	cmd.Stderr = logs
+	cmd.Env = append(os.Environ(), "PACKFILES_BUILD_DIR="+cfg.PackfilesBuildDir)
 	if cfg.SSHAuthSock != "" {
-		cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK="+cfg.SSHAuthSock)
+		cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+cfg.SSHAuthSock)
 	}
 
 	stdin, err := cmd.StdinPipe()

@@ -153,6 +153,11 @@ func main() {
 		os.Exit(plaklet.Main(os.Args[2:]))
 	}
 
+	// Run as cached
+	if len(os.Args) > 1 && os.Args[1] == "cached" {
+		os.Exit(RunAsCached(os.Args[2:]))
+	}
+
 	var cfg Config
 	var enrollmentKey, organizationID, poolEnrollmentKey, name, rawTags string
 
@@ -207,6 +212,10 @@ func main() {
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if err := startCached(rootCtx, cfg.plakletCacheDir(), cfg.plakletPkgDir()); err != nil {
+		fatal("failed to run cached: %v", err)
+	}
 
 	// Bring up the supervision + metrics server early so /health answers while
 	// the edge is still enrolling. It reports live immediately and flips to

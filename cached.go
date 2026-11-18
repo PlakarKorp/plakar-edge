@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -16,6 +15,8 @@ import (
 func RunAsCached(args []string) int {
 	var pkgdir, cachedir string
 
+	log.SetPrefix("cached: ")
+
 	fs := flag.NewFlagSet("plaklet", flag.ContinueOnError)
 	fs.StringVar(&pkgdir, "pkg", "", "package/integrations directory (reserved; connectors are linked in-process)")
 	fs.StringVar(&cachedir, "cache", "", "cache directory (required)")
@@ -24,17 +25,17 @@ func RunAsCached(args []string) int {
 	}
 
 	if cachedir == "" {
-		fmt.Fprintln(os.Stderr, "cached: -cache is required")
+		log.Println("-cache is required")
 		return 2
 	}
 	if pkgdir == "" {
-		fmt.Fprintln(os.Stderr, "cached: -pkg is required")
+		log.Println("-pkg is required")
 		return 2
 	}
 
 	err := cached.RunCached(cachedir, pkgdir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cached: failed: %v\n", err)
+		log.Printf("failed: %v", err)
 		return 1
 	}
 

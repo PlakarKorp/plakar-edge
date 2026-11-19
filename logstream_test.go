@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -82,7 +83,7 @@ func TestLogStreamerMarksLostChunk(t *testing.T) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		var rep Reply
+		var rep plaklet.ExecReply
 		_ = json.NewDecoder(r.Body).Decode(&rep)
 		got = append(got, rep.Message)
 	}))
@@ -105,9 +106,9 @@ func TestLogStreamerMarksLostChunk(t *testing.T) {
 }
 
 func TestLogStreamerFlushesPeriodically(t *testing.T) {
-	got := make(chan Reply, 1)
+	got := make(chan plaklet.ExecReply, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var rep Reply
+		var rep plaklet.ExecReply
 		_ = json.NewDecoder(r.Body).Decode(&rep)
 		got <- rep
 	}))
@@ -120,7 +121,7 @@ func TestLogStreamerFlushesPeriodically(t *testing.T) {
 
 	select {
 	case rep := <-got:
-		if rep.Type != ReplyLog || rep.Message != "early\n" {
+		if rep.Type != plaklet.ReplyLog || rep.Message != "early\n" {
 			t.Fatalf("reply = %+v, want the log line", rep)
 		}
 	case <-time.After(2 * time.Second):

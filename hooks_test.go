@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -101,7 +102,7 @@ func TestRunWorkRunsHooksAroundPlaklet(t *testing.T) {
 	writeHookScript(t, scripts, "pre.sh", marker, "")
 	writeHookScript(t, scripts, "post.sh", marker, "")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -115,7 +116,7 @@ func TestRunWorkRunsHooksAroundPlaklet(t *testing.T) {
 	if got := readMarker(t, marker); len(got) != 2 || got[0] != "pre_job" || got[1] != "post_job" {
 		t.Fatalf("hooks ran = %v, want [pre_job post_job]", got)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplySuccess {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplySuccess {
 		t.Fatalf("replies = %+v, want one ReplySuccess", replies)
 	}
 }
@@ -125,7 +126,7 @@ func TestRunWorkPreHookFailureAbortsTheWork(t *testing.T) {
 	writeHookScript(t, scripts, "pre.sh", marker, "echo cannot quiesce >&2\nexit 1")
 	writeHookScript(t, scripts, "post.sh", marker, "")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -142,7 +143,7 @@ func TestRunWorkPreHookFailureAbortsTheWork(t *testing.T) {
 	if got := readMarker(t, marker); len(got) != 1 || got[0] != "pre_job" {
 		t.Fatalf("hooks ran = %v, want [pre_job]", got)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplyFailure {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplyFailure {
 		t.Fatalf("replies = %+v, want one ReplyFailure", replies)
 	}
 	for _, want := range []string{"pre-job hook", "pre.sh", "cannot quiesce"} {
@@ -157,7 +158,7 @@ func TestRunWorkMissingScriptsDirFailsAHookedWork(t *testing.T) {
 	writeHookScript(t, scripts, "pre.sh", marker, "")
 	cfg.ScriptsDir = "" // the operator never opted into scripts
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -170,7 +171,7 @@ func TestRunWorkMissingScriptsDirFailsAHookedWork(t *testing.T) {
 	if got := readMarker(t, marker); got != nil {
 		t.Fatalf("hooks ran = %v, want none", got)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplyFailure || !strings.Contains(replies[0].Message, "no -scripts-dir") {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplyFailure || !strings.Contains(replies[0].Message, "no -scripts-dir") {
 		t.Fatalf("replies = %+v, want one ReplyFailure naming the missing -scripts-dir", replies)
 	}
 }
@@ -179,7 +180,7 @@ func TestRunWorkPostHookFailureFailsASuccessfulWork(t *testing.T) {
 	cfg, scripts, marker := hooksTestSetup(t, "success")
 	writeHookScript(t, scripts, "post.sh", marker, "echo cannot resume >&2\nexit 1")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -191,7 +192,7 @@ func TestRunWorkPostHookFailureFailsASuccessfulWork(t *testing.T) {
 
 	// Plaklet succeeded but its cleanup did not: exactly one terminal reply,
 	// and it is a failure naming the post-job hook.
-	if len(replies) != 1 || replies[0].Type != ReplyFailure {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplyFailure {
 		t.Fatalf("replies = %+v, want one ReplyFailure", replies)
 	}
 	for _, want := range []string{"post-job hook", "post.sh", "cannot resume"} {
@@ -205,7 +206,7 @@ func TestRunWorkPostHookRunsAndReportsAfterPlakletFailure(t *testing.T) {
 	cfg, scripts, marker := hooksTestSetup(t, "failure")
 	writeHookScript(t, scripts, "post.sh", marker, "exit 1")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -221,7 +222,7 @@ func TestRunWorkPostHookRunsAndReportsAfterPlakletFailure(t *testing.T) {
 	if got := readMarker(t, marker); len(got) != 1 || got[0] != "post_job" {
 		t.Fatalf("hooks ran = %v, want [post_job]", got)
 	}
-	if len(replies) != 2 || replies[0].Type != ReplyError || replies[1].Type != ReplyFailure {
+	if len(replies) != 2 || replies[0].Type != plaklet.ReplyError || replies[1].Type != plaklet.ReplyFailure {
 		t.Fatalf("replies = %+v, want [error, failure]", replies)
 	}
 	if replies[1].Message != "boom" {
@@ -232,7 +233,7 @@ func TestRunWorkPostHookRunsAndReportsAfterPlakletFailure(t *testing.T) {
 func TestRunWorkWithoutHooksRunsNoScript(t *testing.T) {
 	cfg, _, marker := hooksTestSetup(t, "success")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -243,7 +244,7 @@ func TestRunWorkWithoutHooksRunsNoScript(t *testing.T) {
 	if got := readMarker(t, marker); got != nil {
 		t.Fatalf("hooks ran = %v, want none", got)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplySuccess {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplySuccess {
 		t.Fatalf("replies = %+v, want one ReplySuccess", replies)
 	}
 }
@@ -253,7 +254,7 @@ func TestRunWorkStreamsHookOutputToTheLog(t *testing.T) {
 	writeHookScript(t, scripts, "pre.sh", marker, "echo freezing\necho warn >&2")
 	writeHookScript(t, scripts, "post.sh", marker, "echo thawing")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -271,7 +272,7 @@ func TestRunWorkStreamsHookOutputToTheLog(t *testing.T) {
 	if got := logText(replies); got != want {
 		t.Fatalf("log = %q, want %q", got, want)
 	}
-	if last := replies[len(replies)-1]; last.Type != ReplySuccess {
+	if last := replies[len(replies)-1]; last.Type != plaklet.ReplySuccess {
 		t.Fatalf("last reply = %+v, want the terminal after the log", last)
 	}
 }

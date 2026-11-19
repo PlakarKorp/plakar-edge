@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +55,7 @@ func TestSpawnPlakletPassesSSHAuthSock(t *testing.T) {
 	cfg := testConfig(t, bin)
 	cfg.SSHAuthSock = "/nonexistent/agent.sock"
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 

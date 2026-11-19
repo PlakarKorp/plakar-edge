@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -38,28 +39,28 @@ func TestMain(m *testing.M) {
 //   - "crash": exits nonzero without emitting anything.
 //   - "authsock": emits ReplySuccess carrying its SSH_AUTH_SOCK.
 func fakePlakletMain() {
-	var payload ExecPayload
+	var payload plaklet.ExecPayload
 	_ = json.NewDecoder(os.Stdin).Decode(&payload)
 
 	enc := json.NewEncoder(os.Stdout)
 	switch os.Getenv("PLAKAR_EDGE_FAKE_PLAKLET_SCRIPT") {
 	case "success":
-		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: "ok"})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplySuccess, Message: "ok"})
 	case "failure":
-		_ = enc.Encode(ExecReply{Type: ReplyFailure, Message: "boom"})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplyFailure, Message: "boom"})
 	case "multi":
-		_ = enc.Encode(ExecReply{Type: ReplyInfo, Message: "working"})
-		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: "done"})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplyInfo, Message: "working"})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplySuccess, Message: "done"})
 	case "stderr":
 		fmt.Fprintln(os.Stderr, "scanning /etc")
 		fmt.Fprintln(os.Stderr, "done")
-		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: "ok"})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplySuccess, Message: "ok"})
 	case "silent":
 		// no output, clean exit
 	case "crash":
 		os.Exit(1)
 	case "authsock":
-		_ = enc.Encode(ExecReply{Type: ReplySuccess, Message: os.Getenv("SSH_AUTH_SOCK")})
+		_ = enc.Encode(plaklet.ExecReply{Type: plaklet.ReplySuccess, Message: os.Getenv("SSH_AUTH_SOCK")})
 	default:
 		fmt.Fprintln(os.Stderr, "unknown script")
 		os.Exit(2)
@@ -122,7 +123,7 @@ func TestSpawnPlakletSuccess(t *testing.T) {
 	bin := writePlakletWrapper(t, "success")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -133,7 +134,7 @@ func TestSpawnPlakletSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if terminal == nil || terminal.Type != ReplySuccess {
+	if terminal == nil || terminal.Type != plaklet.ReplySuccess {
 		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
 	}
 	if len(replies) != 0 {
@@ -145,7 +146,7 @@ func TestSpawnPlakletFailureReplyIsForwardedNotErrored(t *testing.T) {
 	bin := writePlakletWrapper(t, "failure")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -159,7 +160,7 @@ func TestSpawnPlakletFailureReplyIsForwardedNotErrored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if terminal == nil || terminal.Type != ReplyFailure || terminal.Message != "boom" {
+	if terminal == nil || terminal.Type != plaklet.ReplyFailure || terminal.Message != "boom" {
 		t.Fatalf("terminal = %+v, want ReplyFailure(boom)", terminal)
 	}
 	if len(replies) != 0 {
@@ -171,7 +172,7 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	bin := writePlakletWrapper(t, "multi")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -182,10 +183,10 @@ func TestSpawnPlakletMultipleReplies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("spawnPlaklet: %v", err)
 	}
-	if len(replies) != 1 || replies[0].Type != ReplyInfo {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplyInfo {
 		t.Fatalf("replies = %+v, want [info] (the terminal is held for the caller)", replies)
 	}
-	if terminal == nil || terminal.Type != ReplySuccess {
+	if terminal == nil || terminal.Type != plaklet.ReplySuccess {
 		t.Fatalf("terminal = %+v, want ReplySuccess", terminal)
 	}
 }
@@ -194,7 +195,7 @@ func TestRunWorkForwardsPlakletStderrAsLog(t *testing.T) {
 	bin := writePlakletWrapper(t, "stderr")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -203,7 +204,7 @@ func TestRunWorkForwardsPlakletStderrAsLog(t *testing.T) {
 	if got := logText(replies); got != "scanning /etc\ndone\n" {
 		t.Fatalf("log = %q, want plaklet's stderr", got)
 	}
-	if last := replies[len(replies)-1]; last.Type != ReplySuccess {
+	if last := replies[len(replies)-1]; last.Type != plaklet.ReplySuccess {
 		t.Fatalf("last reply = %+v, want the terminal after the log", last)
 	}
 }
@@ -212,7 +213,7 @@ func TestSpawnPlakletSilentExitSynthesizesFailure(t *testing.T) {
 	bin := writePlakletWrapper(t, "silent")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -229,7 +230,7 @@ func TestSpawnPlakletCrashSynthesizesFailure(t *testing.T) {
 	bin := writePlakletWrapper(t, "crash")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -248,7 +249,7 @@ func TestSpawnPlakletCrashSynthesizesFailure(t *testing.T) {
 func TestSpawnPlakletMissingBinary(t *testing.T) {
 	cfg := testConfig(t, "/nonexistent/plaklet-binary-xyz")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -277,7 +278,7 @@ func TestSpawnPlakletSendsCorrectArgs(t *testing.T) {
 func TestRunWorkReportsFailureOnSpawnError(t *testing.T) {
 	cfg := testConfig(t, "/nonexistent/plaklet-binary-xyz")
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -287,7 +288,7 @@ func TestRunWorkReportsFailureOnSpawnError(t *testing.T) {
 	runWork(context.Background(), clt, cfg, item)
 
 	replies = withoutLogs(replies)
-	if len(replies) != 1 || replies[0].Type != ReplyFailure {
+	if len(replies) != 1 || replies[0].Type != plaklet.ReplyFailure {
 		t.Fatalf("replies = %+v, want one ReplyFailure", replies)
 	}
 }
@@ -296,7 +297,7 @@ func TestRunWorkNoDoubleReplyOnPlakletSuccess(t *testing.T) {
 	bin := writePlakletWrapper(t, "success")
 	cfg := testConfig(t, bin)
 
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
@@ -312,14 +313,14 @@ func TestRunWorkNoDoubleReplyOnPlakletSuccess(t *testing.T) {
 }
 
 func TestForwardReplyPassesFieldsThrough(t *testing.T) {
-	var replies []Reply
+	var replies []plaklet.ExecReply
 	srv := newReplyCapturingServer(&replies)
 	defer srv.Close()
 
 	clt := NewClient(srv.URL)
 	workID := uuid.New()
-	r := ExecReply{
-		Type:    ReplyReport,
+	r := plaklet.ExecReply{
+		Type:    plaklet.ReplyReport,
 		Message: "progress",
 		Report:  json.RawMessage(`{"bytes":42}`),
 		State:   json.RawMessage(`{"cursor":"x"}`),
@@ -330,7 +331,7 @@ func TestForwardReplyPassesFieldsThrough(t *testing.T) {
 		t.Fatalf("replies = %+v, want 1", replies)
 	}
 	got := replies[0]
-	if got.Type != ReplyReport || got.Message != "progress" {
+	if got.Type != plaklet.ReplyReport || got.Message != "progress" {
 		t.Errorf("got = %+v", got)
 	}
 	if string(got.Report) != `{"bytes":42}` {
@@ -350,7 +351,7 @@ func TestForwardReplyDoesNotPanicOnTransportError(t *testing.T) {
 	clt := NewClient(srv.URL)
 	done := make(chan struct{})
 	go func() {
-		forwardReply(context.Background(), clt, uuid.New(), ExecReply{Type: ReplySuccess})
+		forwardReply(context.Background(), clt, uuid.New(), plaklet.ExecReply{Type: plaklet.ReplySuccess})
 		close(done)
 	}()
 	select {
@@ -362,11 +363,11 @@ func TestForwardReplyDoesNotPanicOnTransportError(t *testing.T) {
 
 // newReplyCapturingServer starts an httptest.Server that accepts enroll/poll
 // silently and appends every posted Reply body into *replies.
-func newReplyCapturingServer(replies *[]Reply) *httptest.Server {
+func newReplyCapturingServer(replies *[]plaklet.ExecReply) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.Body != nil {
-			var rep Reply
+			var rep plaklet.ExecReply
 			dec := json.NewDecoder(bufio.NewReader(r.Body))
 			if err := dec.Decode(&rep); err == nil {
 				*replies = append(*replies, rep)
@@ -378,10 +379,10 @@ func newReplyCapturingServer(replies *[]Reply) *httptest.Server {
 }
 
 // logText concatenates the log replies.
-func logText(replies []Reply) string {
+func logText(replies []plaklet.ExecReply) string {
 	var s string
 	for _, r := range replies {
-		if r.Type == ReplyLog {
+		if r.Type == plaklet.ReplyLog {
 			s += r.Message
 		}
 	}
@@ -389,10 +390,10 @@ func logText(replies []Reply) string {
 }
 
 // withoutLogs drops the log replies, leaving the ones that carry protocol.
-func withoutLogs(replies []Reply) []Reply {
-	var out []Reply
+func withoutLogs(replies []plaklet.ExecReply) []plaklet.ExecReply {
+	var out []plaklet.ExecReply
 	for _, r := range replies {
-		if r.Type != ReplyLog && r.Type != ReplyInfo {
+		if r.Type != plaklet.ReplyLog && r.Type != plaklet.ReplyInfo {
 			out = append(out, r)
 		}
 	}

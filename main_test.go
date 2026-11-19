@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -314,7 +315,7 @@ type fakeControlPlane struct {
 
 	mu      sync.Mutex
 	slots   []int
-	replies []ReplyType
+	replies []plaklet.ReplyType
 }
 
 func newFakeControlPlane(t *testing.T) (*fakeControlPlane, *httptest.Server) {
@@ -349,7 +350,7 @@ func newFakeControlPlane(t *testing.T) (*fakeControlPlane, *httptest.Server) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("/api/v1/edge/", func(w http.ResponseWriter, r *http.Request) {
-		var rep Reply
+		var rep plaklet.ExecReply
 		_ = json.NewDecoder(r.Body).Decode(&rep)
 		cp.mu.Lock()
 		cp.replies = append(cp.replies, rep.Type)
@@ -370,7 +371,7 @@ func (cp *fakeControlPlane) lastSlots() int {
 	return cp.slots[len(cp.slots)-1]
 }
 
-func (cp *fakeControlPlane) replied(typ ReplyType) bool {
+func (cp *fakeControlPlane) replied(typ plaklet.ReplyType) bool {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 	return slices.Contains(cp.replies, typ)
@@ -445,7 +446,7 @@ func TestPollLoopCancelsRunningWork(t *testing.T) {
 	// The slot comes back only once runWork has returned, i.e. plaklet was killed.
 	waitFor(t, "the slot to be freed by the cancel", func() bool { return cp.lastSlots() == 1 })
 
-	if cp.replied(ReplyFailure) || cp.replied(ReplySuccess) {
+	if cp.replied(plaklet.ReplyFailure) || cp.replied(plaklet.ReplySuccess) {
 		t.Error("a canceled work must not send a terminal reply")
 	}
 }
@@ -470,7 +471,7 @@ func TestPollLoopIgnoresCancelForUnknownWork(t *testing.T) {
 func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 	var pollCount atomic.Int32
 	var mu sync.Mutex
-	var gotReply Reply
+	var gotReply plaklet.ExecReply
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/edge/poll", func(w http.ResponseWriter, r *http.Request) {
@@ -503,8 +504,8 @@ func TestPollLoopDispatchesWorkAndReplies(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if gotReply.Type != ReplyFailure {
-		t.Errorf("gotReply.Type = %q, want %q", gotReply.Type, ReplyFailure)
+	if gotReply.Type != plaklet.ReplyFailure {
+		t.Errorf("gotReply.Type = %q, want %q", gotReply.Type, plaklet.ReplyFailure)
 	}
 }
 

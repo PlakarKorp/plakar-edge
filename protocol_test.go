@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -14,7 +15,7 @@ import (
 func TestConfigurationFieldDecodeCompatible(t *testing.T) {
 	controlPlaneJSON := `{"key":"bucket","val":"my-bucket"}`
 
-	var f ConfigurationField
+	var f plaklet.ConfigurationField
 	if err := json.Unmarshal([]byte(controlPlaneJSON), &f); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -44,16 +45,16 @@ func TestWorkItemToExecPayload(t *testing.T) {
 		WorkId:     uuid.New(),
 		Op:         "backup",
 		TaskConfig: map[string]string{"path": "/etc"},
-		Source: &Configuration{
+		Source: &plaklet.Configuration{
 			Id:   cfgID,
 			Type: "fs",
-			Fields: []ConfigurationField{
+			Fields: []plaklet.ConfigurationField{
 				{Key: "root", Val: "/data"},
 			},
 		},
 	}
 
-	payload := ExecPayload{
+	payload := plaklet.ExecPayload{
 		Op:         item.Op,
 		TaskConfig: item.TaskConfig,
 		Source:     item.Source,
@@ -65,7 +66,7 @@ func TestWorkItemToExecPayload(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var decoded ExecPayload
+	var decoded plaklet.ExecPayload
 	if err := json.Unmarshal(buf, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -83,12 +84,12 @@ func TestWorkItemToExecPayload(t *testing.T) {
 func TestExecReplyPassesReportAndStateVerbatim(t *testing.T) {
 	raw := `{"type":"report","message":"","report":{"bytes":123,"files":4},"state":{"cursor":"abc"}}`
 
-	var r ExecReply
+	var r plaklet.ExecReply
 	if err := json.Unmarshal([]byte(raw), &r); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if r.Type != ReplyReport {
-		t.Errorf("Type = %q, want %q", r.Type, ReplyReport)
+	if r.Type != plaklet.ReplyReport {
+		t.Errorf("Type = %q, want %q", r.Type, plaklet.ReplyReport)
 	}
 
 	// Report/State must survive as raw JSON, unparsed, so they can be
@@ -111,7 +112,7 @@ func TestExecReplyPassesReportAndStateVerbatim(t *testing.T) {
 }
 
 func TestReplyOmitsEmptyOptionalFields(t *testing.T) {
-	buf, err := json.Marshal(Reply{Type: ReplyInfo, Message: "hello"})
+	buf, err := json.Marshal(plaklet.ExecReply{Type: plaklet.ReplyInfo, Message: "hello"})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -157,14 +158,14 @@ func TestPollRequestIncludesTagsWhenSet(t *testing.T) {
 }
 
 func TestReplyTypeConstants(t *testing.T) {
-	types := map[ReplyType]string{
-		ReplyInfo:    "info",
-		ReplyWarning: "warning",
-		ReplyError:   "error",
-		ReplyReport:  "report",
-		ReplyState:   "state",
-		ReplyFailure: "failure",
-		ReplySuccess: "success",
+	types := map[plaklet.ReplyType]string{
+		plaklet.ReplyInfo:    "info",
+		plaklet.ReplyWarning: "warning",
+		plaklet.ReplyError:   "error",
+		plaklet.ReplyReport:  "report",
+		plaklet.ReplyState:   "state",
+		plaklet.ReplyFailure: "failure",
+		plaklet.ReplySuccess: "success",
 	}
 	for typ, want := range types {
 		if string(typ) != want {

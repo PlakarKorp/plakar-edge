@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
 
@@ -159,11 +160,11 @@ func TestReplySuccess(t *testing.T) {
 		if r.URL.Path != wantPath {
 			t.Errorf("path = %s, want %s", r.URL.Path, wantPath)
 		}
-		var reply Reply
+		var reply plaklet.ExecReply
 		if err := json.NewDecoder(r.Body).Decode(&reply); err != nil {
 			t.Fatalf("decode reply: %v", err)
 		}
-		if reply.Type != ReplySuccess || reply.Message != "done" {
+		if reply.Type != plaklet.ReplySuccess || reply.Message != "done" {
 			t.Errorf("reply = %+v", reply)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -171,7 +172,7 @@ func TestReplySuccess(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	err := c.Reply(context.Background(), workID, Reply{Type: ReplySuccess, Message: "done"})
+	err := c.Reply(context.Background(), workID, plaklet.ExecReply{Type: plaklet.ReplySuccess, Message: "done"})
 	if err != nil {
 		t.Fatalf("Reply: %v", err)
 	}
@@ -185,7 +186,7 @@ func TestReplyErrorIncludesBody(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	err := c.Reply(context.Background(), uuid.New(), Reply{Type: ReplyFailure})
+	err := c.Reply(context.Background(), uuid.New(), plaklet.ExecReply{Type: plaklet.ReplyFailure})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

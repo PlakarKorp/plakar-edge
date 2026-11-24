@@ -43,6 +43,12 @@ func RunAsCached(args []string) int {
 }
 
 func startCached(ctx context.Context, cachedir string, pkgdir string) error {
+	for _, dir := range []string{cachedir, pkgdir} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+	}
+
 	self, err := os.Executable()
 	if err != nil {
 		return err

@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"sync"
 	"syscall"
@@ -77,7 +76,7 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 	// Make sure the connector packages this work item needs are present, fetching
 	// any that are missing through the control-plane proxy.
 	k := keepAlive(keepalivecb("fetching packages..."))
-	err := ensurePackages(ctx, clt, cfg, item)
+	err := ensurePackages(ctx, item)
 	k.Stop()
 	if err != nil {
 		fail(err)
@@ -155,12 +154,7 @@ func runWork(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) {
 // ensurePackages fetches, through the control-plane proxy, any connector package
 // named by the work item's source/target that is not already present in the
 // edge's integrations dir. Packages are cached there and reused across runs.
-func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkItem) error {
-	intdir := cfg.plakletPkgDir()
-	if err := os.MkdirAll(intdir, 0o755); err != nil {
-		return fmt.Errorf("cannot create integrations dir: %w", err)
-	}
-
+func ensurePackages(ctx context.Context, item *WorkItem) error {
 	seen := map[string]bool{}
 	for _, conf := range []*plaklet.Configuration{item.Source, item.Target} {
 		if conf == nil || conf.Integration.Name == "" {
@@ -184,17 +178,19 @@ func ensurePackages(ctx context.Context, clt *Client, cfg *Config, item *WorkIte
 		}
 		seen[key] = true
 
-		filename := p.Filename()
-		dst := filepath.Join(intdir, filename)
-		if _, err := os.Stat(dst); err == nil {
-			continue // already present
+		found, err := thePkgManager.HasPackage(p)
+		if err != nil {
+			return fmt.Errorf("failed to check package %s: %w", key, err)
+		}
+		if found {
+			continue
 		}
 
 		log.Printf("fetching connector package %s (%s/%s) via control plane", key, runtime.GOOS, runtime.GOARCH)
-		if err := clt.FetchPackage(ctx, &p, dst); err != nil {
+		if err := thePkgManager.InstallPackage(ctx, p); err != nil {
 			return fmt.Errorf("failed to fetch package %s: %w", key, err)
 		}
-		log.Printf("installed %s", filename)
+		log.Printf("installed %s", key)
 	}
 	return nil
 }

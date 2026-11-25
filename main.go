@@ -311,6 +311,11 @@ func main() {
 		cfg.SSHAuthSock = sock
 	}
 
+	thePkgManager, err = NewPkgManager(&cfg, clt)
+	if err != nil {
+		fatal("failed to setup pkg manager: %v", err)
+	}
+
 	// Enrolled and about to poll: the edge is ready to be dispatched work.
 	hlth.setReady(true)
 

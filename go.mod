@@ -3,7 +3,9 @@ module github.com/PlakarKorp/plakar-edge
 go 1.26.10
 
 require (
+	github.com/PlakarKorp/go-signify v0.1.0
 	github.com/PlakarKorp/integrations/fs v1.1.12
+	github.com/PlakarKorp/kloset v1.1.16-rc.4
 	github.com/PlakarKorp/pkg v1.1.12
 	github.com/PlakarKorp/plaklet v1.1.9-rc.3
 	github.com/alecthomas/kingpin/v2 v2.4.0
@@ -22,7 +24,6 @@ require (
 	github.com/PlakarKorp/go-human2duration v0.1.6 // indirect
 	github.com/PlakarKorp/integration-sdk v1.1.5 // indirect
 	github.com/PlakarKorp/integrations/ptar v1.1.3 // indirect
-	github.com/PlakarKorp/kloset v1.1.16-rc.4 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
 	github.com/RaduBerinde/btreemap v0.0.0-20250419232817-bf0d809ae648 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
@@ -41,6 +42,7 @@ require (
 	github.com/dennwc/btrfs v0.0.0-20260222081608-edfb8b9e4f55 // indirect
 	github.com/dennwc/ioctl v1.0.1-0.20181021180353-017804252068 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
+	github.com/ebfe/bcrypt_pbkdf v0.0.0-20140212075826-3c8d2dcb253a // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/ema/qdisc v1.0.0 // indirect
 	github.com/ericlagergren/polyval v0.0.0-20220411101811-e25bc10ba391 // indirect

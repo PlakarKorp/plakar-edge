@@ -91,9 +91,13 @@ func (c *Client) Reply(ctx context.Context, workID uuid.UUID, reply plaklet.Exec
 // FetchPackage downloads a connector package for the given name/version and the
 // edge's own platform, through the control-plane proxy, and writes it to dst.
 // The edge is assumed to have no network access beyond the control plane.
-func (c *Client) FetchPackage(ctx context.Context, p *pkg.Package, dst string) error {
-	path := fmt.Sprintf("/api/v1/edge/packages/%s/%s?os=%s&arch=%s",
-		url.PathEscape(p.Name), url.PathEscape(p.Version), url.QueryEscape(p.OperatingSystem),
+func (c *Client) FetchPackage(ctx context.Context, p *pkg.Package, signature bool, dst string) error {
+	suffix := ""
+	if signature {
+		suffix = "/signature"
+	}
+	path := fmt.Sprintf("/api/v1/edge/packages/%s/%s%s?os=%s&arch=%s",
+		url.PathEscape(p.Name), url.PathEscape(p.Version), suffix, url.QueryEscape(p.OperatingSystem),
 		url.QueryEscape(p.Architecture))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)

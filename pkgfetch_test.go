@@ -28,7 +28,7 @@ func TestFetchPackageWritesFile(t *testing.T) {
 
 	p := &pkg.Package{Name: "s3", Version: "v1.1.4", OperatingSystem: "linux", Architecture: "arm64"}
 	dst := filepath.Join(t.TempDir(), p.Filename())
-	if err := c.FetchPackage(context.Background(), p, dst); err != nil {
+	if err := c.FetchPackage(context.Background(), p, false, dst); err != nil {
 		t.Fatalf("FetchPackage: %v", err)
 	}
 
@@ -61,7 +61,7 @@ func TestFetchPackageErrorLeavesNoFile(t *testing.T) {
 
 	p := &pkg.Package{Name: "nope", Version: "v9", OperatingSystem: "linux", Architecture: "arm64"}
 	dst := filepath.Join(t.TempDir(), "missing.ptar")
-	err := c(srv).FetchPackage(context.Background(), p, dst)
+	err := c(srv).FetchPackage(context.Background(), p, false, dst)
 	if err == nil {
 		t.Fatal("want error on 404")
 	}

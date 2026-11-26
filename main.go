@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -30,6 +31,7 @@ import (
 	_ "github.com/PlakarKorp/integrations/fs/exporter"
 	_ "github.com/PlakarKorp/integrations/fs/importer"
 	_ "github.com/PlakarKorp/integrations/fs/storage"
+	"github.com/PlakarKorp/plakar-edge/mtls"
 	"github.com/PlakarKorp/plaklet"
 	"github.com/google/uuid"
 )
@@ -77,6 +79,10 @@ type Config struct {
 	// plaklet as SSH_AUTH_SOCK so integrations can load keys into it. Empty
 	// when no agent could be started; plaklet then inherits the edge's env.
 	SSHAuthSock string
+
+	ProxyListenAddr     string
+	ProxyCert           tls.Certificate
+	ProxyKeyFingerprint string
 }
 
 // plakletPkgDir and plakletCacheDir derive the paths plaklet expects from the
@@ -177,6 +183,7 @@ func main() {
 	flag.BoolVar(&cfg.Metrics, "metrics", true, "expose node-exporter metrics at /metrics on the -listen address")
 	flag.StringVar(&rawTags, "tags", "", "comma-separated key=value tags to self-report to the control plane (e.g. role=ingest,env=prod); PLAKAR_EDGE_EXTRA_TAGS adds to them")
 	flag.StringVar(&cfg.ScriptsDir, "scripts-dir", "", "directory containing the pre/post-job hook scripts tasks may name; empty (default) refuses every hook script")
+	flag.StringVar(&cfg.ProxyListenAddr, "proxy", "", "address to listen on (enable proxy mode)")
 	flag.Parse()
 
 	cfg.Tags = edgeTags(rawTags, os.Getenv("PLAKAR_EDGE_EXTRA_TAGS"))
@@ -214,6 +221,14 @@ func main() {
 			cfg.ScriptsDir = abs
 		}
 	}
+
+	// Generate cert and key fingerprint
+	cert, keyfp, err := mtls.Gencert()
+	if err != nil {
+		fatal("failed to run generate certificate: %v", err)
+	}
+	cfg.ProxyCert = cert
+	cfg.ProxyKeyFingerprint = mtls.Fingerprint(keyfp)
 
 	hostname, _ := os.Hostname()
 	if name == "" {
@@ -443,6 +458,11 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 	}
 
 	poll.Executor.Enabled = true
+	if cfg.ProxyListenAddr != "" {
+		poll.Proxy.Enabled = true
+		poll.Proxy.Fingerprint = cfg.ProxyKeyFingerprint
+		poll.Proxy.Endpoints = []string{cfg.ProxyListenAddr}
+	}
 
 	var slots atomic.Int64
 	var mu sync.Mutex

@@ -75,6 +75,12 @@ type PollRequest struct {
 		Enabled bool `json:"enabled"`
 		Slots   int  `json:"slots"`
 	} `json:"executor,omitzero"`
+
+	Proxy struct {
+		Enabled     bool     `json:"enabled"`
+		Fingerprint string   `json:"fingerprint"`
+		Endpoints   []string `json:"endpoints"`
+	} `json:"proxy,omitzero"`
 }
 
 type PollResponseType string

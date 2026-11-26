@@ -442,6 +442,8 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 		Tags:            cfg.Tags,
 	}
 
+	poll.Executor.Enabled = true
+
 	var slots atomic.Int64
 	var mu sync.Mutex
 	cancels := map[uuid.UUID]func(){}
@@ -462,10 +464,10 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 
 		pollCtx, pollCancel := context.WithCancelCause(ctx)
 		mu.Lock()
-		poll.Slots = int(slots.Load())
+		poll.Executor.Slots = int(slots.Load())
 		interruptPoll = pollCancel
 		mu.Unlock()
-		item, err := clt.Poll(pollCtx, cfg.PollHold, poll)
+		res, err := clt.Poll(pollCtx, cfg.PollHold, poll)
 		mu.Lock()
 		interruptPoll = nil
 		mu.Unlock()
@@ -495,9 +497,15 @@ func pollLoop(ctx context.Context, clt *Client, cfg *Config) {
 			}
 			continue
 		}
-		if item == nil {
+		if res == nil {
 			continue // no work; poll again
 		}
+		if res.Type != PollWorkItem {
+			log.Printf("poll: unknown response type %q", res.Type)
+			continue
+		}
+
+		item := &res.WorkItem
 
 		if item.Op == "cancel" {
 			mu.Lock()
